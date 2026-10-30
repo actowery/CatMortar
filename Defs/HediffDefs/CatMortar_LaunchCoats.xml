@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <HediffDef><defName>CatMortar_LaunchCoatOrange</defName><label>orange launch coat</label><description>This cat has been assigned the orange fire payload.</description><isBad>false</isBad><skinColorOverride>(242,122,41)</skinColorOverride></HediffDef>
+  <HediffDef><defName>CatMortar_LaunchCoatBlack</defName><label>black launch coat</label><description>This cat has been assigned the black EMP payload.</description><isBad>false</isBad><skinColorOverride>(46,46,46)</skinColorOverride></HediffDef>
+  <HediffDef><defName>CatMortar_LaunchCoatCream</defName><label>cream launch coat</label><description>This cat has been assigned the cream firefoam and stun payload.</description><isBad>false</isBad><skinColorOverride>(224,209,179)</skinColorOverride></HediffDef>
+  <HediffDef><defName>CatMortar_LaunchCoatBrown</defName><label>brown launch coat</label><description>This cat has been assigned the brown anti-grain payload.</description><isBad>false</isBad><skinColorOverride>(115,92,64)</skinColorOverride></HediffDef>
+</Defs>
