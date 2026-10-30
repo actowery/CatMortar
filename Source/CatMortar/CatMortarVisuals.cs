@@ -29,7 +29,7 @@ public static class CatMortarVisuals
     public static void AssignRandomCoat(Pawn pawn)
     {
         RemoveLaunchCoats(pawn);
-        pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed(CoatHediffs[CatMortarRules.CoatForRoll(Rand.Value)]));
+        if (pawn.health is not null) pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed(CoatHediffs[CatMortarRules.CoatForRoll(Rand.Value)]));
     }
 
     public static void RemoveLaunchCoats(Pawn pawn)

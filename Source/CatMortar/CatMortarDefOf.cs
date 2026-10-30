@@ -6,6 +6,6 @@ namespace CatMortar;
 [DefOf]
 public static class CatMortarDefOf
 {
-    public static JobDef CatMortar_Load;
+    public static JobDef CatMortar_Load = null!;
     static CatMortarDefOf() => DefOfHelper.EnsureInitializedInCtor(typeof(CatMortarDefOf));
 }

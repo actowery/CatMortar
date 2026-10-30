@@ -63,7 +63,7 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         else
         {
             ApplyCoatPayload(cell, map, CatMortarRules.PayloadFor(coatIndex));
-            ReleaseLivingCat(payload as Pawn, cell, map);
+            if (payload is Pawn cat) ReleaseLivingCat(cat, cell, map);
         }
         Destroy();
     }
@@ -83,10 +83,9 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
             case CatCoatPayload.CreamFirefoamStun:
                 GenExplosion.DoExplosion(cell, map, 4f, DamageDefOf.Extinguish, Launcher, postExplosionSpawnThingDef: ThingDefOf.Filth_FireFoam, postExplosionSpawnChance: 1f, postExplosionSpawnThingCount: 10);
                 GenExplosion.DoExplosion(cell, map, 4f, DamageDefOf.Stun, Launcher);
-                for (var index = 0; index < 12; index++) MoteMaker.ThrowMicroSparks(cell.ToVector3Shifted() + Rand.InsideUnitCircleVec3 * 3f, map);
                 break;
             case CatCoatPayload.BrownAntigrain:
-                GenExplosion.DoExplosion(cell, map, CatMortarRules.BrownAftershockRadius, DamageDefOf.BombSuper, Launcher);
+                GenExplosion.DoExplosion(cell, map, CatMortarRules.BrownAftershockRadius, DefDatabase<DamageDef>.GetNamed("BombSuper"), Launcher);
                 break;
         }
     }

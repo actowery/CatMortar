@@ -14,7 +14,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
 
     public Building_CatMortar() => innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
 
-    public Thing LoadedThing => innerContainer.FirstOrDefault();
+    public Thing? LoadedThing => innerContainer.FirstOrDefault();
     public bool HasLoadedCat => LoadedThing is not null;
 
     public override void ExposeData()
@@ -30,26 +30,26 @@ public sealed class Building_CatMortar : Building, IThingHolder
     public override IEnumerable<Gizmo> GetGizmos()
     {
         foreach (var gizmo in base.GetGizmos()) yield return gizmo;
-        yield return new Command_Target
+        var loadCommand = new Command_Target
         {
             defaultLabel = "Load cat",
             defaultDesc = "Designate one colony cat or cat corpse. The cat is suspended inside the mortar until fired.",
             icon = TexCommand.Install,
             targetingParams = new TargetingParameters { canTargetPawns = true, canTargetItems = true, validator = target => CanAccept(target.Thing) },
             action = target => OrderLoad(target.Thing),
-            disabled = HasLoadedCat,
-            disabledReason = HasLoadedCat ? "A cat is already loaded." : null
         };
-        yield return new Command_Target
+        if (HasLoadedCat) loadCommand.Disable("A cat is already loaded.");
+        yield return loadCommand;
+        var fireCommand = new Command_Target
         {
             defaultLabel = "Fire loaded cat",
             defaultDesc = "Launch the loaded cat as artillery. Loading is permanent until firing.",
             icon = TexCommand.Attack,
-            targetingParams = TargetingParameters.ForAttackHostile(),
+            targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = true, canTargetBuildings = true, canTargetItems = true },
             action = target => LaunchAt(target.Cell),
-            disabled = !HasLoadedCat,
-            disabledReason = HasLoadedCat ? null : "Load a colony cat or cat corpse first."
         };
+        if (!HasLoadedCat) fireCommand.Disable("Load a colony cat or cat corpse first.");
+        yield return fireCommand;
     }
 
     public bool CanAccept(Thing thing)
@@ -84,6 +84,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
     {
         if (!HasLoadedCat || Map is null || !targetCell.InBounds(Map)) return;
         var payload = LoadedThing;
+        if (payload is null) return;
         var shell = (Projectile_CatMortarShell)ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("Projectile_CatMortarShell"));
         shell.LoadPayload(payload, payload is Pawn pawn ? CatMortarVisuals.CoatFor(pawn) : -1);
         GenSpawn.Spawn(shell, Position, Map);
