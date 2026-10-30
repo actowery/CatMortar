@@ -1,0 +1,9 @@
+bin/
+obj/
+TestResults/
+1.6/Assemblies/CatLauncher*
+1.7/Assemblies/CatLauncher*
+artifacts/
+outputs/
+.vs/
+
