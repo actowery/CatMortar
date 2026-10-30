@@ -34,11 +34,13 @@ public static class CatMortarVisuals
 
     public static void RemoveLaunchCoats(Pawn pawn)
     {
+        var health = pawn.health;
+        if (health is null) return;
         foreach (var hediffName in CoatHediffs)
         {
             var def = DefDatabase<HediffDef>.GetNamedSilentFail(hediffName);
-            var hediff = def is null ? null : pawn.health?.hediffSet?.GetFirstHediffOfDef(def);
-            if (hediff is not null) pawn.health.RemoveHediff(hediff);
+            var hediff = def is null ? null : health.hediffSet.GetFirstHediffOfDef(def);
+            if (hediff is not null) health.RemoveHediff(hediff);
         }
     }
 }
