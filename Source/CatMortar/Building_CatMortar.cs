@@ -33,6 +33,10 @@ public sealed class Building_CatMortar : Building, IThingHolder
     public override IEnumerable<Gizmo> GetGizmos()
     {
         foreach (var gizmo in base.GetGizmos()) yield return gizmo;
+        // A minified building has no map or interaction cell. Its own install command is
+        // supplied by MinifiedThing; do not expose artillery controls until it is placed.
+        if (!Spawned || Map is null) yield break;
+
         var loadCommand = new Command_Target
         {
             defaultLabel = "Load cat",
