@@ -16,6 +16,7 @@ Assert-Condition (@($about.ModMetaData.supportedVersions.li) -contains '1.7') 'R
 Assert-Condition ((Get-Item $previewPath).Length -lt 1MB) 'Workshop preview must be smaller than 1 MB.'
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Building_CatMortar') 'Mortar definition missing.'
 Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).thingClass -eq 'CatMortar.Building_CatMortar') 'Mortar class missing.'
+Assert-Condition (@(($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).thingCategories.li) -contains 'BuildingsSecurity') 'Mortar must appear in RimWorld security building lists.'
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Projectile_CatMortarShell') 'Projectile definition missing.'
 Assert-Condition (Test-Path $jobsPath) 'Cat loading job definition missing.'
 Assert-Condition (@($coats.Defs.HediffDef).Count -eq 4) 'Expected four launch coat definitions.'
