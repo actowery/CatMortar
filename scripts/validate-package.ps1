@@ -29,9 +29,7 @@ Assert-Condition (Test-Path $jobsPath) 'Cat loading job definition missing.'
 Assert-Condition (-not ((Get-Content -Raw $jobsPath) -match 'checkOverrideOnExpire')) 'Removed RimWorld job field must not return.'
 Assert-Condition (@($coats.Defs.HediffDef).Count -eq 4) 'Expected four launch coat definitions.'
 Assert-Condition (@($coats.Defs.HediffDef | Where-Object { $_.description -and $_.skinColorOverride }).Count -eq 4) 'Launch coats need descriptions and native skin-color overrides.'
-Assert-Condition (Test-Path (Join-Path $RepositoryRoot 'Textures\Things\Building\Security\CatMortar.png')) 'Mortar texture missing.'
-Assert-Condition (Test-Path (Join-Path $RepositoryRoot 'Textures\Things\Building\Security\CatMortar_MenuIcon.png')) 'Mortar menu icon missing.'
-Assert-Condition (Test-Path (Join-Path $RepositoryRoot 'Textures\Things\Building\Security\CatMortar_Minified.png')) 'Compact mortar texture missing.'
+Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).graphicData.texPath -eq 'Things/Building/Security/TurretMortar_Base') 'Cat mortar must reuse the vanilla mortar base texture.'
 foreach ($version in 'v1.6','v1.7') { Assert-Condition (@($loadFolders.loadFolders.$version.li) -contains '/') "Shared root is not loaded for $version." }
 if ($RequireBinaries) { foreach ($version in '1.6','1.7') { Assert-Condition (Test-Path (Join-Path $RepositoryRoot "$version\Assemblies\CatMortar.dll")) "Missing $version assembly." } }
 Write-Output 'Package validation passed.'

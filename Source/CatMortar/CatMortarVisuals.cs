@@ -26,6 +26,13 @@ public static class CatMortarVisuals
         return 0;
     }
 
+    public static int EnsureCoat(Pawn pawn)
+    {
+        for (var index = 0; index < CoatHediffs.Length; index++)
+            if (pawn.health?.hediffSet?.HasHediff(DefDatabase<HediffDef>.GetNamedSilentFail(CoatHediffs[index])) == true) return index;
+        return AssignRandomCoat(pawn);
+    }
+
     public static int AssignRandomCoat(Pawn pawn)
     {
         return AssignCoat(pawn, CatMortarRules.CoatForRoll(Rand.Value));
@@ -36,6 +43,7 @@ public static class CatMortarVisuals
         var normalized = CatMortarRules.NormalizeCoatIndex(coatIndex);
         RemoveLaunchCoats(pawn);
         if (pawn.health is not null) pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed(CoatHediffs[normalized]));
+        pawn.Drawer?.renderer?.SetAllGraphicsDirty();
         return normalized;
     }
 

@@ -101,7 +101,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
     {
         if (!CanAccept(thing)) return false;
         if (!innerContainer.TryAddOrTransfer(thing, canMergeWithExistingStacks: false)) return false;
-        loadedCoatIndex = thing is Pawn pawn ? CatMortarVisuals.AssignRandomCoat(pawn) : -1;
+        loadedCoatIndex = thing is Pawn pawn ? CatMortarVisuals.EnsureCoat(pawn) : -1;
         DefDatabase<SoundDef>.GetNamed("Artillery_ShellLoaded").PlayOneShot(new TargetInfo(Position, Map));
         return true;
     }
@@ -149,6 +149,18 @@ public sealed class Building_CatMortar : Building, IThingHolder
     {
         base.DrawExtraSelectionOverlays();
         if (Spawned) GenDraw.DrawRadiusRing(Position, CatMortarRules.MortarMinimumRange, Color.red);
+    }
+
+    protected override void DrawAt(Vector3 drawLoc, bool flip = false)
+    {
+        base.DrawAt(drawLoc, flip);
+        var topGraphic = GraphicDatabase.Get<Graphic_Single>(
+            "Things/Building/Security/TurretMortar_Top",
+            ShaderDatabase.Cutout,
+            new Vector2(4f, 4f),
+            new Color(0.92f, 0.62f, 0.28f));
+        drawLoc.y += 0.01f;
+        topGraphic.Draw(drawLoc, Rotation, this);
     }
 
     private void QueueLaunch(IntVec3 targetCell, bool automatic)
