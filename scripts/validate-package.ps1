@@ -21,6 +21,7 @@ Assert-Condition (-not [string]::IsNullOrWhiteSpace(($defs.Defs.ThingDef | Where
 Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).tickerType -eq 'Normal') 'Explosive mortar must use a Normal ticker.'
 Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).size -eq '(2,2)') 'Cat mortar must use the vanilla mortar footprint.'
 Assert-Condition (@(($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).placeWorkers.li) -contains 'PlaceWorker_NotUnderRoof') 'Cat mortar must reject roofed placement.'
+Assert-Condition (-not (@(($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).placeWorkers.li) -contains 'PlaceWorker_TurretTop')) 'Custom cat mortar must not use vanilla turret-only placement code.'
 Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).minifiedDef -eq 'Minified_CatMortar') 'Cat mortar needs a dedicated compact minified definition.'
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Minified_CatMortar') 'Compact cat mortar definition missing.'
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Projectile_CatMortarShell') 'Projectile definition missing.'
