@@ -11,16 +11,19 @@ namespace CatMortar;
 public sealed class Building_CatMortar : Building, IThingHolder
 {
     private ThingOwner<Thing> innerContainer;
+    private int loadedCoatIndex = -1;
 
     public Building_CatMortar() => innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
 
     public Thing? LoadedThing => innerContainer.FirstOrDefault();
     public bool HasLoadedCat => LoadedThing is not null;
+    private bool IsManned => GetComp<CompMannable>()?.MannedNow ?? false;
 
     public override void ExposeData()
     {
         base.ExposeData();
         Scribe_Deep.Look(ref innerContainer, "innerContainer", this);
+        Scribe_Values.Look(ref loadedCoatIndex, "loadedCoatIndex", -1);
         if (innerContainer is null) innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
     }
 
@@ -35,7 +38,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "Load cat",
             defaultDesc = "Designate one colony cat or cat corpse. The cat is suspended inside the mortar until fired.",
             icon = TexCommand.Install,
-            targetingParams = new TargetingParameters { canTargetPawns = true, canTargetItems = true, validator = target => CanAccept(target.Thing) },
+            targetingParams = new TargetingParameters { canTargetPawns = true, canTargetItems = true, canTargetCorpses = true, validator = target => CanAccept(target.Thing) },
             action = target => OrderLoad(target.Thing),
         };
         if (HasLoadedCat) loadCommand.Disable("A cat is already loaded.");
@@ -45,10 +48,12 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "Fire loaded cat",
             defaultDesc = "Launch the loaded cat as artillery. Loading is permanent until firing.",
             icon = TexCommand.Attack,
-            targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = true, canTargetBuildings = true, canTargetItems = true },
+            targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = false, canTargetBuildings = false, canTargetItems = false, validator = target => IsValidTargetCell(target.Cell) },
             action = target => LaunchAt(target.Cell),
         };
         if (!HasLoadedCat) fireCommand.Disable("Load a colony cat or cat corpse first.");
+        else if (!IsManned) fireCommand.Disable("A colonist must man the cat mortar.");
+        else if (Position.Roofed(Map)) fireCommand.Disable("The cat mortar cannot fire while roofed.");
         yield return fireCommand;
     }
 
@@ -62,8 +67,10 @@ public sealed class Building_CatMortar : Building, IThingHolder
     public bool TryAccept(Thing thing)
     {
         if (!CanAccept(thing)) return false;
-        if (thing is Pawn pawn) CatMortarVisuals.AssignRandomCoat(pawn);
-        return innerContainer.TryAddOrTransfer(thing, canMergeWithExistingStacks: false);
+        if (!innerContainer.TryAddOrTransfer(thing, canMergeWithExistingStacks: false)) return false;
+        loadedCoatIndex = thing is Pawn pawn ? CatMortarVisuals.AssignRandomCoat(pawn) : -1;
+        DefDatabase<SoundDef>.GetNamed("Artillery_ShellLoaded").PlayOneShot(new TargetInfo(Position, Map));
+        return true;
     }
 
     public void OrderLoad(Thing target)
@@ -77,24 +84,41 @@ public sealed class Building_CatMortar : Building, IThingHolder
             Messages.Message("No colonist can load that cat.", this, MessageTypeDefOf.RejectInput, false);
             return;
         }
-        hauler.jobs.TryTakeOrderedJob(JobMaker.MakeJob(CatMortarDefOf.CatMortar_Load, target, this));
+        var job = JobMaker.MakeJob(CatMortarDefOf.CatMortar_Load, target, this);
+        job.count = 1;
+        hauler.jobs.TryTakeOrderedJob(job);
     }
 
     public void LaunchAt(IntVec3 targetCell)
     {
-        if (!HasLoadedCat || Map is null || !targetCell.InBounds(Map)) return;
+        if (!HasLoadedCat || Map is null || !targetCell.InBounds(Map) || !IsManned || Position.Roofed(Map) || !IsValidTargetCell(targetCell)) return;
         var payload = LoadedThing;
         if (payload is null) return;
         var shell = (Projectile_CatMortarShell)ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("Projectile_CatMortarShell"));
-        shell.LoadPayload(payload, payload is Pawn pawn ? CatMortarVisuals.CoatFor(pawn) : -1);
+        shell.LoadPayload(payload, payload is Pawn ? loadedCoatIndex : -1);
+        loadedCoatIndex = -1;
         GenSpawn.Spawn(shell, Position, Map);
-        DefDatabase<SoundDef>.GetNamed("Building_Mortar_Fire").PlayOneShot(new TargetInfo(Position, Map));
+        DefDatabase<SoundDef>.GetNamed("Mortar_LaunchA").PlayOneShot(new TargetInfo(Position, Map));
+        DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
         shell.Launch(this, DrawPos, new LocalTargetInfo(targetCell), new LocalTargetInfo(targetCell), ProjectileHitFlags.IntendedTarget, false, null);
+    }
+
+    public override string GetInspectString()
+    {
+        var inspect = base.GetInspectString();
+        return HasLoadedCat ? $"{inspect}\nLoaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}" : inspect;
+    }
+
+    private bool IsValidTargetCell(IntVec3 targetCell)
+    {
+        if (Map is null || !targetCell.InBounds(Map)) return false;
+        return CatMortarRules.IsWithinMortarRange(Position.DistanceTo(targetCell));
     }
 
     public override void Destroy(DestroyMode mode = DestroyMode.Vanish)
     {
         if (Spawned && innerContainer?.Any == true) innerContainer.TryDropAll(Position, Map, ThingPlaceMode.Near);
+        loadedCoatIndex = -1;
         base.Destroy(mode);
     }
 }
