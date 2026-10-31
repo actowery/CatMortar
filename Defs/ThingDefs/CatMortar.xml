@@ -3,7 +3,7 @@
   <ThingDef ParentName="BuildingBase">
     <defName>Building_CatMortar</defName><label>cat mortar</label><description>A cat-themed artillery mortar. Load one colony cat or cat corpse, then launch it with disastrous results.</description><thingClass>CatMortar.Building_CatMortar</thingClass>
     <graphicData><texPath>Things/Building/Security/CatMortar</texPath><graphicClass>Graphic_Single</graphicClass><drawSize>(3,3)</drawSize></graphicData><uiIconPath>Things/Building/Security/CatMortar</uiIconPath>
-    <category>Building</category><designationCategory>Security</designationCategory><passability>PassThroughOnly</passability><pathCost>50</pathCost><rotatable>true</rotatable><size>(1,1)</size><altitudeLayer>Building</altitudeLayer>
+    <category>Building</category><thingCategories><li>BuildingsSecurity</li></thingCategories><minifiedDef>MinifiedThing</minifiedDef><tickerType>Normal</tickerType><designationCategory>Security</designationCategory><passability>PassThroughOnly</passability><pathCost>50</pathCost><rotatable>true</rotatable><size>(1,1)</size><altitudeLayer>Building</altitudeLayer>
     <statBases><MaxHitPoints>280</MaxHitPoints><Flammability>0.8</Flammability><WorkToBuild>3000</WorkToBuild><Mass>35</Mass></statBases><costList><Steel>350</Steel><ComponentIndustrial>25</ComponentIndustrial><Chemfuel>100</Chemfuel></costList><researchPrerequisites><li>Mortars</li></researchPrerequisites>
     <comps><li Class="CompProperties_Explosive"><explosiveRadius>4.9</explosiveRadius><explosiveDamageType>Bomb</explosiveDamageType><wickTicks>240</wickTicks></li><li Class="CompProperties_Stunnable"><affectedDamageDefs><li>Stun</li><li>EMP</li></affectedDamageDefs></li></comps>
   </ThingDef>
