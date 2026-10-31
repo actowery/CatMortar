@@ -7,7 +7,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [h2]Features[/h2]
 [list]
 [*]A dedicated one-cat suspended loading chamber—no ordinary shells required.
-[*]Living cats receive a random orange, black, cream, or brown launch coat, remain the exact same pawn through flight, and crash-land critically injured outside the blast.
+[*]Colony cats receive a visible orange, black, cream, or brown launch coat before loading. That exact cat and coat persist through flight and survivor recovery.
 [*]A 4.5-tile high-explosive primary blast with expanded vanilla-style blood and short-lived cat fragments.
 [*]Orange ignites; black EMPs, obscures, and darkens; cream firefoams and stuns; brown releases a 6-tile anti-grain-style aftershock.
 [*]Colony cat corpses create a weaker 3-tile explosion and toxic gas instead of a coat payload.
