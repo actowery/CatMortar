@@ -19,6 +19,8 @@ Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building
 Assert-Condition (@(($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).thingCategories.li) -contains 'BuildingsSecurity') 'Mortar must appear in RimWorld security building lists.'
 Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).minifiedDef -eq 'MinifiedThing') 'Categorized mortar must be minifiable.'
 Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).tickerType -eq 'Normal') 'Explosive mortar must use a Normal ticker.'
+Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).size -eq '(2,2)') 'Cat mortar must use the vanilla mortar footprint.'
+Assert-Condition (@(($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building_CatMortar' }).placeWorkers.li) -contains 'PlaceWorker_NotUnderRoof') 'Cat mortar must reject roofed placement.'
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Projectile_CatMortarShell') 'Projectile definition missing.'
 Assert-Condition (Test-Path $jobsPath) 'Cat loading job definition missing.'
 Assert-Condition (-not ((Get-Content -Raw $jobsPath) -match 'checkOverrideOnExpire')) 'Removed RimWorld job field must not return.'

@@ -26,11 +26,26 @@ public static class CatMortarVisuals
         return 0;
     }
 
-    public static void AssignRandomCoat(Pawn pawn)
+    public static int AssignRandomCoat(Pawn pawn)
     {
-        RemoveLaunchCoats(pawn);
-        if (pawn.health is not null) pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed(CoatHediffs[CatMortarRules.CoatForRoll(Rand.Value)]));
+        return AssignCoat(pawn, CatMortarRules.CoatForRoll(Rand.Value));
     }
+
+    public static int AssignCoat(Pawn pawn, int coatIndex)
+    {
+        var normalized = CatMortarRules.NormalizeCoatIndex(coatIndex);
+        RemoveLaunchCoats(pawn);
+        if (pawn.health is not null) pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed(CoatHediffs[normalized]));
+        return normalized;
+    }
+
+    public static string CoatLabel(int coatIndex) => CatMortarRules.NormalizeCoatIndex(coatIndex) switch
+    {
+        0 => "orange fireburst",
+        1 => "black EMP",
+        2 => "cream firefoam",
+        _ => "brown aftershock"
+    };
 
     public static void RemoveLaunchCoats(Pawn pawn)
     {

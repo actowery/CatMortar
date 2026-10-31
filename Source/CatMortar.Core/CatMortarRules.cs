@@ -17,6 +17,8 @@ public static class CatMortarRules
     public const float CorpseExplosionRadius = 3f;
     public const float BrownAftershockRadius = 6f;
     public const float FlightScale = 1.25f;
+    public const float MortarMinimumRange = 29.9f;
+    public const float MortarMaximumRange = 500f;
     public const int MinimumBloodCells = 12;
     public const int MaximumBloodCells = 20;
 
@@ -30,7 +32,9 @@ public static class CatMortarRules
 
     public static int NormalizeCoatIndex(int index) => Math.Min(CoatCount - 1, Math.Max(0, index));
 
-    public static bool IsEligibleCat(bool isCat, bool isPlayerFaction, bool isCorpse) => isCat && isPlayerFaction && (isCorpse || isPlayerFaction);
+    public static bool IsEligibleCat(bool isCat, bool isPlayerFaction, bool isCorpse) => isCat && isPlayerFaction;
+
+    public static bool IsWithinMortarRange(float distance) => distance >= MortarMinimumRange && distance <= MortarMaximumRange;
 
     public static float ExplosionRadius(bool isCorpse) => isCorpse ? CorpseExplosionRadius : LivingExplosionRadius;
 
