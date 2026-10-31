@@ -33,6 +33,10 @@ public sealed class CatMortarRulesTests
     public void Mortar_targeting_enforces_vanilla_artillery_range(float distance, bool expected) => Assert.Equal(expected, CatMortarRules.IsWithinMortarRange(distance));
 
     [Theory]
+    [InlineData(0f, true)] [InlineData(29.8f, true)] [InlineData(29.9f, false)] [InlineData(500f, false)]
+    public void Mortar_dead_zone_is_reported_separately(float distance, bool expected) => Assert.Equal(expected, CatMortarRules.IsTooCloseForMortar(distance));
+
+    [Theory]
     [InlineData("Brain", false)] [InlineData("Heart", false)] [InlineData("Neck", false)] [InlineData("Torso", false)] [InlineData("Leg", true)] [InlineData("Tail", true)] [InlineData("", false)]
     public void Injury_selector_excludes_vital_body_parts(string part, bool expected) => Assert.Equal(expected, CatMortarRules.IsNonVitalPart(part));
 

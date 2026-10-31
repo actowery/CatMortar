@@ -12,18 +12,30 @@ public sealed class Building_CatMortar : Building, IThingHolder
 {
     private ThingOwner<Thing> innerContainer;
     private int loadedCoatIndex = -1;
+    private int pendingLaunchTick = -1;
+    private int cooldownUntilTick;
+    private int nextAutoReloadAttemptTick;
+    private IntVec3 pendingTargetCell;
+    private bool autoTargeting;
 
     public Building_CatMortar() => innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
 
     public Thing? LoadedThing => innerContainer.FirstOrDefault();
     public bool HasLoadedCat => LoadedThing is not null;
     private bool IsManned => GetComp<CompMannable>()?.MannedNow ?? false;
+    private bool LaunchPending => pendingLaunchTick >= 0;
+    private bool CoolingDown => Find.TickManager.TicksGame < cooldownUntilTick;
 
     public override void ExposeData()
     {
         base.ExposeData();
         Scribe_Deep.Look(ref innerContainer, "innerContainer", this);
         Scribe_Values.Look(ref loadedCoatIndex, "loadedCoatIndex", -1);
+        Scribe_Values.Look(ref pendingLaunchTick, "pendingLaunchTick", -1);
+        Scribe_Values.Look(ref cooldownUntilTick, "cooldownUntilTick", 0);
+        Scribe_Values.Look(ref nextAutoReloadAttemptTick, "nextAutoReloadAttemptTick", 0);
+        Scribe_Values.Look(ref pendingTargetCell, "pendingTargetCell");
+        Scribe_Values.Look(ref autoTargeting, "autoTargeting", false);
         if (innerContainer is null) innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
     }
 
@@ -50,16 +62,27 @@ public sealed class Building_CatMortar : Building, IThingHolder
         yield return loadCommand;
         var fireCommand = new Command_Target
         {
-            defaultLabel = "Fire loaded cat",
-            defaultDesc = "Launch the loaded cat as artillery. Loading is permanent until firing.",
+            defaultLabel = "Force target",
+            defaultDesc = "Aim the loaded cat like a mortar. Targets inside the red dead zone are rejected.",
             icon = TexCommand.Attack,
-            targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = false, canTargetBuildings = false, canTargetItems = false, validator = target => IsValidTargetCell(target.Cell) },
-            action = target => LaunchAt(target.Cell),
+            targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = true, canTargetBuildings = true, canTargetItems = true },
+            action = target => QueueLaunch(target.Cell, false),
         };
         if (!HasLoadedCat) fireCommand.Disable("Load a colony cat or cat corpse first.");
         else if (!IsManned) fireCommand.Disable("A colonist must man the cat mortar.");
         else if (Position.Roofed(Map)) fireCommand.Disable("The cat mortar cannot fire while roofed.");
+        else if (LaunchPending) fireCommand.Disable("The cat mortar is aiming.");
+        else if (CoolingDown) fireCommand.Disable("The cat mortar is cooling down.");
         yield return fireCommand;
+
+        yield return new Command_Toggle
+        {
+            defaultLabel = "Auto-target enemies",
+            defaultDesc = "When manned and loaded, automatically aim at the nearest hostile pawn outside the mortar's dead zone.",
+            icon = TexCommand.Attack,
+            isActive = () => autoTargeting,
+            toggleAction = () => autoTargeting = !autoTargeting,
+        };
     }
 
     public bool CanAccept(Thing thing)
@@ -94,9 +117,56 @@ public sealed class Building_CatMortar : Building, IThingHolder
         hauler.jobs.TryTakeOrderedJob(job);
     }
 
-    public void LaunchAt(IntVec3 targetCell)
+    protected override void Tick()
     {
-        if (!HasLoadedCat || Map is null || !targetCell.InBounds(Map) || !IsManned || Position.Roofed(Map) || !IsValidTargetCell(targetCell)) return;
+        base.Tick();
+        if (!Spawned || Map is null) return;
+
+        var now = Find.TickManager.TicksGame;
+        if (LaunchPending && now >= pendingLaunchTick)
+        {
+            pendingLaunchTick = -1;
+            LaunchAt(pendingTargetCell);
+        }
+
+        if (!HasLoadedCat && !LaunchPending && now >= nextAutoReloadAttemptTick) TryOrderNearestNonBondedCat(now);
+        if (autoTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueAutoTarget();
+    }
+
+    public override void DrawExtraSelectionOverlays()
+    {
+        base.DrawExtraSelectionOverlays();
+        if (Spawned) GenDraw.DrawRadiusRing(Position, CatMortarRules.MortarMinimumRange, Color.red);
+    }
+
+    private void QueueLaunch(IntVec3 targetCell, bool automatic)
+    {
+        if (!CanStartLaunch(targetCell, automatic)) return;
+        pendingTargetCell = targetCell;
+        pendingLaunchTick = Find.TickManager.TicksGame + CatMortarRules.MortarWarmupTicks;
+        if (!automatic) Messages.Message("Cat mortar aiming: 4 seconds.", this, MessageTypeDefOf.NeutralEvent, false);
+    }
+
+    private bool CanStartLaunch(IntVec3 targetCell, bool automatic)
+    {
+        if (!HasLoadedCat || Map is null || !targetCell.InBounds(Map) || !IsManned || Position.Roofed(Map) || LaunchPending || CoolingDown) return false;
+        var distance = Position.DistanceTo(targetCell);
+        if (CatMortarRules.IsTooCloseForMortar(distance))
+        {
+            if (!automatic) Messages.Message("Target is too close for the cat mortar.", this, MessageTypeDefOf.RejectInput, false);
+            return false;
+        }
+        if (!CatMortarRules.IsWithinMortarRange(distance))
+        {
+            if (!automatic) Messages.Message("Target is beyond the cat mortar's range.", this, MessageTypeDefOf.RejectInput, false);
+            return false;
+        }
+        return true;
+    }
+
+    private void LaunchAt(IntVec3 targetCell)
+    {
+        if (!CanStartLaunch(targetCell, true)) return;
         var payload = LoadedThing;
         if (payload is null) return;
         var shell = (Projectile_CatMortarShell)ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("Projectile_CatMortarShell"));
@@ -106,25 +176,51 @@ public sealed class Building_CatMortar : Building, IThingHolder
         DefDatabase<SoundDef>.GetNamed("Mortar_LaunchA").PlayOneShot(new TargetInfo(Position, Map));
         DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
         shell.Launch(this, DrawPos, new LocalTargetInfo(targetCell), new LocalTargetInfo(targetCell), ProjectileHitFlags.IntendedTarget, false, null);
+        cooldownUntilTick = Find.TickManager.TicksGame + CatMortarRules.MortarCooldownTicks;
+        nextAutoReloadAttemptTick = Find.TickManager.TicksGame + CatMortarRules.AutoReloadRetryTicks;
     }
 
     public override string GetInspectString()
     {
         if (!Spawned || Map is null) return string.Empty;
         var inspect = base.GetInspectString();
-        return HasLoadedCat ? $"{inspect}\nLoaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}" : inspect;
+        if (!HasLoadedCat) return inspect;
+
+        var payloadInfo = $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
+        return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }
 
-    private bool IsValidTargetCell(IntVec3 targetCell)
+    private void TryQueueAutoTarget()
     {
-        if (Map is null || !targetCell.InBounds(Map)) return false;
-        return CatMortarRules.IsWithinMortarRange(Position.DistanceTo(targetCell));
+        var target = Map.mapPawns.AllPawnsSpawned
+            .Where(pawn => pawn.HostileTo(Faction.OfPlayer) && CanStartLaunch(pawn.Position, true))
+            .OrderBy(pawn => Position.DistanceToSquared(pawn.Position))
+            .FirstOrDefault();
+        if (target is not null) QueueLaunch(target.Position, true);
     }
+
+    private void TryOrderNearestNonBondedCat(int now)
+    {
+        nextAutoReloadAttemptTick = now + CatMortarRules.AutoReloadRetryTicks;
+        var cat = Map.mapPawns.AllPawnsSpawned
+            .Where(IsAutomaticAmmoCat)
+            .OrderBy(pawn => Position.DistanceToSquared(pawn.Position))
+            .FirstOrDefault();
+        if (cat is not null) OrderLoad(cat);
+    }
+
+    private static bool IsAutomaticAmmoCat(Pawn pawn) => pawn.def.defName == "Cat"
+        && pawn.Faction == Faction.OfPlayer
+        && pawn.Spawned
+        && !pawn.Dead
+        && !pawn.Downed
+        && pawn.relations?.DirectRelations?.All(relation => relation.def != PawnRelationDefOf.Bond) == true;
 
     public override void Destroy(DestroyMode mode = DestroyMode.Vanish)
     {
         if (Spawned && innerContainer?.Any == true) innerContainer.TryDropAll(Position, Map, ThingPlaceMode.Near);
         loadedCoatIndex = -1;
+        pendingLaunchTick = -1;
         base.Destroy(mode);
     }
 }
