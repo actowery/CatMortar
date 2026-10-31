@@ -17,12 +17,15 @@ public sealed class Building_CatMortar : Building, IThingHolder
     private int nextAutoReloadAttemptTick;
     private IntVec3 pendingTargetCell;
     private bool autoTargeting;
+    private bool reloadPending;
+    private Pawn? pendingReloadPawn;
 
     public Building_CatMortar() => innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
 
     public Thing? LoadedThing => innerContainer.FirstOrDefault();
     public bool HasLoadedCat => LoadedThing is not null;
     private bool IsManned => GetComp<CompMannable>()?.MannedNow ?? false;
+    private Pawn? ManningPawn => GetComp<CompMannable>()?.ManningPawn;
     private bool LaunchPending => pendingLaunchTick >= 0;
     private bool CoolingDown => Find.TickManager.TicksGame < cooldownUntilTick;
 
@@ -36,6 +39,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
         Scribe_Values.Look(ref nextAutoReloadAttemptTick, "nextAutoReloadAttemptTick", 0);
         Scribe_Values.Look(ref pendingTargetCell, "pendingTargetCell");
         Scribe_Values.Look(ref autoTargeting, "autoTargeting", false);
+        Scribe_Values.Look(ref reloadPending, "reloadPending", false);
+        Scribe_References.Look(ref pendingReloadPawn, "pendingReloadPawn");
         if (innerContainer is null) innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
     }
 
@@ -101,20 +106,27 @@ public sealed class Building_CatMortar : Building, IThingHolder
         return true;
     }
 
-    public void OrderLoad(Thing target)
+    public bool OrderLoad(Thing target, Pawn? preferredHauler = null)
     {
-        if (!CanAccept(target) || Map is null) return;
-        var hauler = Map.mapPawns.FreeColonistsSpawned
+        if (!CanAccept(target) || Map is null) return false;
+        var hauler = preferredHauler is not null
+            && preferredHauler.Spawned
+            && preferredHauler.CanReserve(target)
+            && preferredHauler.CanReserve(this)
+            && preferredHauler.CanReach(target, PathEndMode.Touch, Danger.Some)
+            ? preferredHauler
+            : Map.mapPawns.FreeColonistsSpawned
             .Where(pawn => pawn.CanReserve(target) && pawn.CanReserve(this) && pawn.CanReach(target, PathEndMode.Touch, Danger.Some))
             .OrderBy(pawn => pawn.Position.DistanceToSquared(target.Position)).FirstOrDefault();
         if (hauler is null)
         {
-            Messages.Message("No colonist can load that cat.", this, MessageTypeDefOf.RejectInput, false);
-            return;
+            if (preferredHauler is null) Messages.Message("No colonist can load that cat.", this, MessageTypeDefOf.RejectInput, false);
+            return false;
         }
         var job = JobMaker.MakeJob(CatMortarDefOf.CatMortar_Load, target, this);
         job.count = 1;
         hauler.jobs.TryTakeOrderedJob(job);
+        return true;
     }
 
     protected override void Tick()
@@ -129,7 +141,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
             LaunchAt(pendingTargetCell);
         }
 
-        if (!HasLoadedCat && !LaunchPending && now >= nextAutoReloadAttemptTick) TryOrderNearestNonBondedCat(now);
+        if (reloadPending && !HasLoadedCat && !LaunchPending && now >= nextAutoReloadAttemptTick) TryOperatorReload(now);
         if (autoTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueAutoTarget();
     }
 
@@ -176,8 +188,11 @@ public sealed class Building_CatMortar : Building, IThingHolder
         DefDatabase<SoundDef>.GetNamed("Mortar_LaunchA").PlayOneShot(new TargetInfo(Position, Map));
         DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
         shell.Launch(this, DrawPos, new LocalTargetInfo(targetCell), new LocalTargetInfo(targetCell), ProjectileHitFlags.IntendedTarget, false, null);
-        cooldownUntilTick = Find.TickManager.TicksGame + CatMortarRules.MortarCooldownTicks;
-        nextAutoReloadAttemptTick = Find.TickManager.TicksGame + CatMortarRules.AutoReloadRetryTicks;
+        var now = Find.TickManager.TicksGame;
+        cooldownUntilTick = now + CatMortarRules.MortarCooldownTicks;
+        pendingReloadPawn = ManningPawn;
+        reloadPending = pendingReloadPawn is not null;
+        nextAutoReloadAttemptTick = cooldownUntilTick;
     }
 
     public override string GetInspectString()
@@ -199,14 +214,19 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (target is not null) QueueLaunch(target.Position, true);
     }
 
-    private void TryOrderNearestNonBondedCat(int now)
+    private void TryOperatorReload(int now)
     {
         nextAutoReloadAttemptTick = now + CatMortarRules.AutoReloadRetryTicks;
+        if (pendingReloadPawn is null || pendingReloadPawn.Dead || !pendingReloadPawn.Spawned)
+        {
+            reloadPending = false;
+            return;
+        }
         var cat = Map.mapPawns.AllPawnsSpawned
             .Where(IsAutomaticAmmoCat)
             .OrderBy(pawn => Position.DistanceToSquared(pawn.Position))
             .FirstOrDefault();
-        if (cat is not null) OrderLoad(cat);
+        if (cat is not null && OrderLoad(cat, pendingReloadPawn)) reloadPending = false;
     }
 
     private static bool IsAutomaticAmmoCat(Pawn pawn) => pawn.def.defName == "Cat"
@@ -221,6 +241,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (Spawned && innerContainer?.Any == true) innerContainer.TryDropAll(Position, Map, ThingPlaceMode.Near);
         loadedCoatIndex = -1;
         pendingLaunchTick = -1;
+        reloadPending = false;
+        pendingReloadPawn = null;
         base.Destroy(mode);
     }
 }
