@@ -3,7 +3,10 @@ obj/
 TestResults/
 1.6/Assemblies/CatLauncher*
 1.7/Assemblies/CatLauncher*
+1.6/Assemblies/CatMortar*
+1.7/Assemblies/CatMortar*
 artifacts/
 outputs/
 .vs/
+work/
 

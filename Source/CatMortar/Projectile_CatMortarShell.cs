@@ -116,6 +116,7 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         var landing = FindSafeLandingCell(center, map);
         payloadContainer.Remove(cat);
         GenSpawn.Spawn(cat, landing, map);
+        CatMortarVisuals.EnsureCoat(cat);
         CatMortarInjuries.ApplyCriticalLandingInjuries(cat);
     }
 
