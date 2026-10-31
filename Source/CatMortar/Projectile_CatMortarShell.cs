@@ -92,6 +92,9 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
 
     private static void MakeToxicCloud(IntVec3 cell, Map map)
     {
+        // Cat Mortar itself has no DLC dependency. A corpse shell simply omits the
+        // Biotech-only gas effect when that expansion is not active.
+        if (!ModLister.BiotechInstalled) return;
         foreach (var gasCell in GenRadial.RadialCellsAround(cell, 5f, true)) if (gasCell.InBounds(map)) GasUtility.AddGas(gasCell, map, GasType.ToxGas, 180);
     }
 

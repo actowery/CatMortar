@@ -112,7 +112,10 @@ public sealed class Building_CatMortar : Building, IThingHolder
     {
         if (!Spawned || Map is null) return string.Empty;
         var inspect = base.GetInspectString();
-        return HasLoadedCat ? $"{inspect}\nLoaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}" : inspect;
+        if (!HasLoadedCat) return inspect;
+
+        var payloadInfo = $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}";
+        return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }
 
     private bool IsValidTargetCell(IntVec3 targetCell)
