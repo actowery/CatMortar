@@ -1,0 +1,29 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "90...100"
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 0%
+        informational: false
+    patch:
+      default:
+        target: 95%
+        threshold: 0%
+        informational: false
+
+flags:
+  rw16:
+    carryforward: false
+  rw17:
+    carryforward: false
+
+ignore:
+  - "**/Tests/**"
+  - "**/obj/**"
+  - "**/bin/**"

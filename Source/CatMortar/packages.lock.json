@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "dependencies": {
+    ".NETFramework,Version=v4.8": {
+      "Krafs.Rimworld.Ref": {
+        "type": "Direct",
+        "requested": "[1.6.4871, )",
+        "resolved": "1.6.4871",
+        "contentHash": "aKebbihZfq47VI9UgyEdrnYslEDeMK3l9+QwC21zL6noJCOLlr5D4+jvhP/F5UA9q+9YVkuTx3NH3eJ03/ivlA=="
+      },
+      "Microsoft.NETFramework.ReferenceAssemblies.net48": {
+        "type": "Direct",
+        "requested": "[1.0.3, )",
+        "resolved": "1.0.3",
+        "contentHash": "zMk4D+9zyiEWByyQ7oPImPN/Jhpj166Ky0Nlla4eXlNL8hI/BtSJsgR8Inldd4NNpIAH3oh8yym0W2DrhXdSLQ=="
+      },
+      "catmortar.core": {
+        "type": "Project"
+      }
+    },
+    "net10.0": {
+      "Krafs.Rimworld.Ref": {
+        "type": "Direct",
+        "requested": "[1.7.4990-unstable, )",
+        "resolved": "1.7.4990-unstable",
+        "contentHash": "YSLchWcIyKOhXEGyN71KJ1sa7ik+mjAgWaZ/q+XEr7aYOebE1Epl15fU1YCXIXMw9M2POnRNx45/507xL41nBQ=="
+      },
+      "catmortar.core": {
+        "type": "Project"
+      }
+    }
+  }
+}

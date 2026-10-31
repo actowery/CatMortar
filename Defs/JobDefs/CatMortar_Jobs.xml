@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs><JobDef><defName>CatMortar_Load</defName><driverClass>CatMortar.JobDriver_CatMortarLoad</driverClass><reportString>loading cat into mortar.</reportString><casualInterruptible>false</casualInterruptible><playerInterruptible>true</playerInterruptible><checkOverrideOnExpire>true</checkOverrideOnExpire></JobDef></Defs>

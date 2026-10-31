@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Cat Mortar</name><author>konduct</author><packageId>konduct.catmortar</packageId>
+  <supportedVersions><li>1.6</li><li>1.7</li></supportedVersions>
+  <description>A cat-themed artillery mortar that loads one colony cat or cat corpse. Living cats gain a random launch coat with a devastating follow-up effect; corpses create a weaker toxic-gas barrage.</description>
+</ModMetaData>

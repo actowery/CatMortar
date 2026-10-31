@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a reproducible Cat Mortar problem.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: dropdown
+    id: rimworld-version
+    attributes:
+      label: RimWorld version
+      options: ["1.6", "1.7 unstable"]
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include expected behavior and exact reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Player.log or error excerpt
+      render: text
+  - type: textarea
+    id: mods
+    attributes:
+      label: Relevant mod list
+      description: Include other mods that change weapons, explosions, pawn graphics, sounds, or animal behavior.
