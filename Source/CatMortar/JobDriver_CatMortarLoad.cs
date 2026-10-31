@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RimWorld;
 using Verse;
 using Verse.AI;
 
@@ -18,7 +19,18 @@ public sealed class JobDriver_CatMortarLoad : JobDriver
         yield return Toils_Goto.GotoThing(TargetIndex.B, PathEndMode.Touch);
         yield return new Toil
         {
-            initAction = () => { if (!Mortar.TryAccept(pawn.carryTracker.CarriedThing)) EndJobWith(JobCondition.Incompletable); },
+            initAction = () =>
+            {
+                if (!Mortar.TryAccept(pawn.carryTracker.CarriedThing))
+                {
+                    EndJobWith(JobCondition.Incompletable);
+                    return;
+                }
+
+                // Reloading interrupts the manning job. Queue it again so the same pawn
+                // returns to the mortar seat immediately after the cat is loaded.
+                pawn.jobs.jobQueue.EnqueueFirst(JobMaker.MakeJob(JobDefOf.ManTurret, Mortar));
+            },
             defaultCompleteMode = ToilCompleteMode.Instant
         };
     }
