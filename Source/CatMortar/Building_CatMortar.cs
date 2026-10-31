@@ -32,10 +32,11 @@ public sealed class Building_CatMortar : Building, IThingHolder
 
     public override IEnumerable<Gizmo> GetGizmos()
     {
-        foreach (var gizmo in base.GetGizmos()) yield return gizmo;
         // A minified building has no map or interaction cell. Its own install command is
-        // supplied by MinifiedThing; do not expose artillery controls until it is placed.
+        // supplied by MinifiedThing; importantly, avoid base building gizmos as well.
         if (!Spawned || Map is null) yield break;
+
+        foreach (var gizmo in base.GetGizmos()) yield return gizmo;
 
         var loadCommand = new Command_Target
         {
@@ -109,6 +110,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
 
     public override string GetInspectString()
     {
+        if (!Spawned || Map is null) return string.Empty;
         var inspect = base.GetInspectString();
         return HasLoadedCat ? $"{inspect}\nLoaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}" : inspect;
     }
