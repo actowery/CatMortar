@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $runtimeEntries = @('About', 'Defs', 'Languages', '1.6', '1.7', 'LoadFolders.xml', 'LICENSE', 'README.md', 'CHANGELOG.md')
 foreach ($entry in $runtimeEntries) { Copy-Item -LiteralPath (Join-Path $RepositoryRoot $entry) -Destination $modRoot -Recurse -Force }
 
-Get-ChildItem -LiteralPath $modRoot -Recurse -File | Where-Object { $_.DirectoryName -like '*\Assemblies' -and $_.Extension -eq '.pdb' } | Remove-Item -Force
+Get-ChildItem -LiteralPath $modRoot -Recurse -File | Where-Object { $_.Directory.Name -eq 'Assemblies' -and $_.Extension -eq '.pdb' } | Remove-Item -Force
 Get-ChildItem -LiteralPath $modRoot -Recurse -File | Where-Object { $_.Name -like 'CatLauncher*.dll' -or $_.Name -like 'CatLauncher*.pdb' } | Remove-Item -Force
 $zipPath = Join-Path $OutputDirectory 'CatMortar.zip'
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
