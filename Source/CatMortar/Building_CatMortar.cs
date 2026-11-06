@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using RimWorld;
@@ -60,11 +61,21 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "Load cat",
             defaultDesc = "Designate one colony cat or cat corpse. The cat is suspended inside the mortar until fired.",
             icon = TexCommand.Install,
-            targetingParams = new TargetingParameters { canTargetPawns = true, canTargetItems = true, canTargetCorpses = true, validator = target => CanAccept(target.Thing) },
+            targetingParams = new TargetingParameters { canTargetPawns = true, canTargetCorpses = true, validator = target => IsLivingCatOrCorpse(target.Thing) },
             action = target => OrderLoad(target.Thing),
         };
         if (HasLoadedCat) loadCommand.Disable("A cat is already loaded.");
         yield return loadCommand;
+        var loadMeatCommand = new Command_Target
+        {
+            defaultLabel = "CatMortar.LoadCatMeat".Translate(),
+            defaultDesc = "CatMortar.LoadCatMeatDesc".Translate(CatMortarRules.MaximumCatMeatPerShot),
+            icon = TexCommand.Install,
+            targetingParams = new TargetingParameters { canTargetItems = true, validator = target => IsCatMeat(target.Thing) },
+            action = target => OrderLoad(target.Thing, Math.Min(CatMortarRules.MaximumCatMeatPerShot, target.Thing.stackCount)),
+        };
+        if (HasLoadedCat) loadMeatCommand.Disable("A cat is already loaded.");
+        yield return loadMeatCommand;
         var fireCommand = new Command_Target
         {
             defaultLabel = "Force target",
@@ -93,8 +104,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
     public bool CanAccept(Thing thing)
     {
         if (thing is null || HasLoadedCat) return false;
-        if (thing is Pawn pawn) return pawn.def.defName == "Cat" && pawn.Faction == Faction.OfPlayer && !pawn.Dead;
-        return thing is Corpse corpse && corpse.InnerPawn?.def?.defName == "Cat" && corpse.InnerPawn.Faction == Faction.OfPlayer;
+        return IsLivingCatOrCorpse(thing) || IsCatMeat(thing);
     }
 
     public bool TryAccept(Thing thing)
@@ -106,7 +116,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         return true;
     }
 
-    public bool OrderLoad(Thing target, Pawn? preferredHauler = null)
+    public bool OrderLoad(Thing target, int count = 1, Pawn? preferredHauler = null)
     {
         if (!CanAccept(target) || Map is null) return false;
         var hauler = preferredHauler is not null
@@ -124,7 +134,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
             return false;
         }
         var job = JobMaker.MakeJob(CatMortarDefOf.CatMortar_Load, target, this);
-        job.count = 1;
+        job.count = Math.Min(Math.Max(1, count), target.stackCount);
         hauler.jobs.TryTakeOrderedJob(job);
         return true;
     }
@@ -213,7 +223,9 @@ public sealed class Building_CatMortar : Building, IThingHolder
         var inspect = base.GetInspectString();
         if (!HasLoadedCat) return inspect;
 
-        var payloadInfo = $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
+        var payloadInfo = IsCatMeat(LoadedThing!)
+            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: meat barrage — {CatMortarRules.CatMeatDamage(LoadedThing.stackCount)} damage, {CatMortarRules.CatMeatExplosionRadius(LoadedThing.stackCount):0.##}-tile radius\nMode: manual load only"
+            : $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
         return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }
 
@@ -238,7 +250,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
             .Where(IsAutomaticAmmoCat)
             .OrderBy(pawn => Position.DistanceToSquared(pawn.Position))
             .FirstOrDefault();
-        if (cat is not null && OrderLoad(cat, pendingReloadPawn)) reloadPending = false;
+        if (cat is not null && OrderLoad(cat, preferredHauler: pendingReloadPawn)) reloadPending = false;
     }
 
     private static bool IsAutomaticAmmoCat(Pawn pawn) => pawn.def.defName == "Cat"
@@ -247,6 +259,15 @@ public sealed class Building_CatMortar : Building, IThingHolder
         && !pawn.Dead
         && !pawn.Downed
         && pawn.relations?.DirectRelations?.All(relation => relation.def != PawnRelationDefOf.Bond) == true;
+
+    private static bool IsLivingCatOrCorpse(Thing? thing)
+    {
+        if (thing is Pawn pawn) return pawn.def.defName == "Cat" && pawn.Faction == Faction.OfPlayer && !pawn.Dead;
+        return thing is Corpse corpse && corpse.InnerPawn?.def?.defName == "Cat" && corpse.InnerPawn.Faction == Faction.OfPlayer;
+    }
+
+    private static bool IsCatMeat(Thing? thing) => thing is not null
+        && CatMortarRules.IsEligibleCatMeat(thing.def.IsMeat, thing.def.defName == "Meat_Cat");
 
     public override void Destroy(DestroyMode mode = DestroyMode.Vanish)
     {

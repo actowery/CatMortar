@@ -8,11 +8,12 @@ Cat Mortar is a standalone RimWorld 1.6 and 1.7 mod by **konduct**. Build a cat-
 
 ## Features
 
-- One living colony cat or cat corpse is held in a dedicated suspended mortar chamber.
+- One living colony cat, cat corpse, or up to 20 cat meat is held in a dedicated suspended mortar chamber.
 - Living cats receive a random orange, black, cream, or brown launch coat and remain the exact same pawn through launch and landing.
 - A 4.5-tile Bomb blast, large vanilla-style blood field, spinning 1.25× cat flight, and catastrophic post-blast payload.
 - Orange ignites, black EMPs and obscures, cream stuns, and brown produces a scaled anti-grain aftershock.
 - Cat corpses give a weaker 3-tile blast and lingering toxic gas instead of a coat payload.
+- Cat meat is manual-load-only and scales smoothly from a small bloody blast at one piece to 25 Bomb damage over a 2.25-tile radius at 20 pieces; it never creates toxic gas, a coat payload, or a survivor.
 
 ## Build
 

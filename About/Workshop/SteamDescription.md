@@ -7,7 +7,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [h2]How to use it[/h2]
 [olist]
 [*]Research [b]Mortars[/b] and build the Cat Mortar outdoors.
-[*]Use [b]Load cat[/b] to designate one of your colony cats or a colony cat corpse.
+[*]Use [b]Load cat[/b] to designate one of your colony cats or a colony cat corpse, or [b]Load cat meat[/b] to load up to 20 cat meat.
 [*]Man the mortar, then either force a target or enable auto-targeting.
 [*]Keep clear of the minimum range. The loaded cat determines the delayed payload.
 [/olist]
@@ -20,6 +20,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [*][b]Orange:[/b] delayed fireburst. [b]Black:[/b] EMP, blind smoke, and a darkness overlay. [b]Cream:[/b] firefoam and a non-damaging stun pulse. [b]Brown:[/b] a scaled 6-tile anti-grain-style aftershock.
 [*]Living ammunition can survive: the exact cat lands safely outside the resolved blast with serious, non-vital injuries.
 [*]Colony cat corpses create a weaker 3-tile explosion and a toxic-gas cloud instead of a coat payload or survivor.
+[*]Cat meat makes a manual-load-only bloody barrage. Each extra piece increases damage, blast radius, and splatter; a full 20-meat round remains weaker than a cat corpse and has no toxic gas, coat payload, or survivor.
 [*]Mortar-style warmup, cooldown, forced targeting, auto-targeting, operator reloading, and vanilla minimum-range behavior.
 [*]No runtime dependencies.
 [/list]

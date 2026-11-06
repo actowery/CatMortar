@@ -42,9 +42,16 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
     protected override void DrawAt(Vector3 drawLoc, bool flip = false)
     {
         InitializeVisuals();
+        var payload = payloadContainer.FirstOrDefault();
+        var rotationDegrees = CatMortarRules.FlightRotation(visualFacing, spinDirection, Find.TickManager.TicksGame - firstDrawTick);
+        if (IsCatMeat(payload))
+        {
+            payload!.Graphic.Draw(drawLoc, new Rot4(visualFacing), payload, rotationDegrees);
+            return;
+        }
         var color = coatIndex >= 0 ? CatMortarVisuals.ColorFor(coatIndex) : Color.gray;
         var graphic = GraphicDatabase.Get<Graphic_Multi>("Things/Pawn/Animal/Cat/Cat", ShaderDatabase.Cutout, new Vector2(CatMortarRules.FlightScale, CatMortarRules.FlightScale), color);
-        var rotation = Quaternion.AngleAxis(CatMortarRules.FlightRotation(visualFacing, spinDirection, Find.TickManager.TicksGame - firstDrawTick), Vector3.up);
+        var rotation = Quaternion.AngleAxis(rotationDegrees, Vector3.up);
         Graphics.DrawMesh(MeshPool.plane10, drawLoc, rotation, graphic.MatAt(new Rot4(visualFacing)), 0);
     }
 
@@ -55,15 +62,27 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         var payload = payloadContainer.FirstOrDefault();
         if (map is null || payload is null) { Destroy(); return; }
 
-        var corpsePayload = payload is Corpse;
-        GenExplosion.DoExplosion(cell, map, CatMortarRules.ExplosionRadius(corpsePayload), DamageDefOf.Bomb, Launcher);
-        DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Death").PlayOneShot(new TargetInfo(cell, map));
-        MakeBloodAndFragments(cell, map);
-        if (corpsePayload) MakeToxicCloud(cell, map);
-        else
+        var ammoType = CatMortarRules.AmmoTypeFor(payload is Pawn, payload is Corpse, IsCatMeat(payload));
+        switch (ammoType)
         {
-            ApplyCoatPayload(cell, map, CatMortarRules.PayloadFor(coatIndex));
-            if (payload is Pawn cat) ReleaseLivingCat(cat, cell, map);
+            case CatMortarAmmoType.CatMeat:
+                var meatCount = CatMortarRules.ClampCatMeatCount(payload.stackCount);
+                GenExplosion.DoExplosion(cell, map, CatMortarRules.CatMeatExplosionRadius(meatCount), DamageDefOf.Bomb, Launcher, damAmount: CatMortarRules.CatMeatDamage(meatCount));
+                MakeBloodAndFragments(cell, map, CatMortarRules.CatMeatBloodCellCount(meatCount));
+                break;
+            case CatMortarAmmoType.CatCorpse:
+                GenExplosion.DoExplosion(cell, map, CatMortarRules.CorpseExplosionRadius, DamageDefOf.Bomb, Launcher);
+                DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Death").PlayOneShot(new TargetInfo(cell, map));
+                MakeBloodAndFragments(cell, map, CatMortarRules.BloodCellCount(Rand.Value));
+                MakeToxicCloud(cell, map);
+                break;
+            case CatMortarAmmoType.LivingCat:
+                GenExplosion.DoExplosion(cell, map, CatMortarRules.LivingExplosionRadius, DamageDefOf.Bomb, Launcher);
+                DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Death").PlayOneShot(new TargetInfo(cell, map));
+                MakeBloodAndFragments(cell, map, CatMortarRules.BloodCellCount(Rand.Value));
+                ApplyCoatPayload(cell, map, CatMortarRules.PayloadFor(coatIndex));
+                ReleaseLivingCat((Pawn)payload, cell, map);
+                break;
         }
         Destroy();
     }
@@ -98,10 +117,10 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         foreach (var gasCell in GenRadial.RadialCellsAround(cell, 5f, true)) if (gasCell.InBounds(map)) GasUtility.AddGas(gasCell, map, GasType.ToxGas, 180);
     }
 
-    private static void MakeBloodAndFragments(IntVec3 cell, Map map)
+    private static void MakeBloodAndFragments(IntVec3 cell, Map map, int bloodCellCount)
     {
         FilthMaker.TryMakeFilth(cell, map, ThingDefOf.Filth_Blood);
-        for (var index = 0; index < CatMortarRules.BloodCellCount(Rand.Value); index++)
+        for (var index = 0; index < bloodCellCount; index++)
         {
             var target = cell + new IntVec3(Rand.RangeInclusive(-5, 5), 0, Rand.RangeInclusive(-5, 5));
             if (!target.InBounds(map)) continue;
@@ -138,4 +157,7 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
             launchSoundPlayed = true;
         }
     }
+
+    private static bool IsCatMeat(Thing? thing) => thing is not null
+        && CatMortarRules.IsEligibleCatMeat(thing.def.IsMeat, thing.def.defName == "Meat_Cat");
 }

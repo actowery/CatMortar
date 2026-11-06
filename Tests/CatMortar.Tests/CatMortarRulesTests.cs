@@ -17,6 +17,24 @@ public sealed class CatMortarRulesTests
     public void Only_colony_cats_are_valid_ammunition(bool isCat, bool playerFaction, bool isCorpse, bool expected) => Assert.Equal(expected, CatMortarRules.IsEligibleCat(isCat, playerFaction, isCorpse));
 
     [Theory]
+    [InlineData(true, true, true)] [InlineData(true, false, false)] [InlineData(false, true, false)]
+    public void Only_cat_sourced_meat_is_valid_meat_ammunition(bool isMeat, bool hasCatSource, bool expected) => Assert.Equal(expected, CatMortarRules.IsEligibleCatMeat(isMeat, hasCatSource));
+
+    [Theory]
+    [InlineData(true, false, false, CatMortarAmmoType.LivingCat)] [InlineData(false, true, false, CatMortarAmmoType.CatCorpse)] [InlineData(false, false, true, CatMortarAmmoType.CatMeat)] [InlineData(false, false, false, CatMortarAmmoType.Unknown)]
+    public void Ammunition_kinds_are_kept_distinct(bool livingCat, bool catCorpse, bool catMeat, CatMortarAmmoType expected) => Assert.Equal(expected, CatMortarRules.AmmoTypeFor(livingCat, catCorpse, catMeat));
+
+    [Theory]
+    [InlineData(0, 1, 6, 0.825f, 4)] [InlineData(1, 1, 6, 0.825f, 4)] [InlineData(5, 5, 10, 1.125f, 6)] [InlineData(10, 10, 15, 1.5f, 9)] [InlineData(15, 15, 20, 1.875f, 11)] [InlineData(20, 20, 25, 2.25f, 14)] [InlineData(99, 20, 25, 2.25f, 14)]
+    public void Cat_meat_scales_smoothly_below_the_corpse_round(int count, int expectedClampedCount, int expectedDamage, float expectedRadius, int expectedBlood)
+    {
+        Assert.Equal(expectedClampedCount, CatMortarRules.ClampCatMeatCount(count));
+        Assert.Equal(expectedDamage, CatMortarRules.CatMeatDamage(count));
+        Assert.Equal(expectedRadius, CatMortarRules.CatMeatExplosionRadius(count), 3);
+        Assert.Equal(expectedBlood, CatMortarRules.CatMeatBloodCellCount(count));
+    }
+
+    [Theory]
     [InlineData(false, 4.5f)] [InlineData(true, 3f)]
     public void Corpse_ammunition_uses_a_degraded_blast(bool corpse, float expected) => Assert.Equal(expected, CatMortarRules.ExplosionRadius(corpse));
 
