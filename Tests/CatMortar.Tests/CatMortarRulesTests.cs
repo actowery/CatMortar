@@ -25,14 +25,24 @@ public sealed class CatMortarRulesTests
     public void Ammunition_kinds_are_kept_distinct(bool livingCat, bool catCorpse, bool catMeat, CatMortarAmmoType expected) => Assert.Equal(expected, CatMortarRules.AmmoTypeFor(livingCat, catCorpse, catMeat));
 
     [Theory]
-    [InlineData(0, 1, 6, 0.825f, 4)] [InlineData(1, 1, 6, 0.825f, 4)] [InlineData(5, 5, 10, 1.125f, 6)] [InlineData(10, 10, 15, 1.5f, 9)] [InlineData(15, 15, 20, 1.875f, 11)] [InlineData(20, 20, 25, 2.25f, 14)] [InlineData(99, 20, 25, 2.25f, 14)]
-    public void Cat_meat_scales_smoothly_below_the_corpse_round(int count, int expectedClampedCount, int expectedDamage, float expectedRadius, int expectedBlood)
+    [InlineData(0, 1)] [InlineData(1, 1)] [InlineData(5, 5)] [InlineData(20, 20)] [InlineData(99, 20)]
+    public void Cat_meat_turns_each_loaded_piece_into_one_scatter_chunk(int count, int expectedChunkCount)
     {
-        Assert.Equal(expectedClampedCount, CatMortarRules.ClampCatMeatCount(count));
-        Assert.Equal(expectedDamage, CatMortarRules.CatMeatDamage(count));
-        Assert.Equal(expectedRadius, CatMortarRules.CatMeatExplosionRadius(count), 3);
-        Assert.Equal(expectedBlood, CatMortarRules.CatMeatBloodCellCount(count));
+        Assert.Equal(expectedChunkCount, CatMortarRules.ClampCatMeatCount(count));
+        Assert.Equal(expectedChunkCount, CatMortarRules.CatMeatChunkCount(count));
     }
+
+    [Fact]
+    public void Cat_meat_barrage_has_an_eight_tile_direct_hit_scatter_field()
+    {
+        Assert.Equal(8f, CatMortarRules.CatMeatScatterRadius);
+        Assert.Equal(4, CatMortarRules.CatMeatChunkDamage);
+        Assert.InRange(CatMortarRules.CatMeatStunChance, 0.19f, 0.21f);
+    }
+
+    [Theory]
+    [InlineData(-1, 4f)] [InlineData(0, 4f)] [InlineData(10, 2.75f)] [InlineData(20, 1.5f)] [InlineData(99, 1.5f)]
+    public void Cat_shots_always_have_small_operator_scaled_imperfection(int shootingLevel, float expectedDeviation) => Assert.Equal(expectedDeviation, CatMortarRules.CatShotDeviation(shootingLevel), 3);
 
     [Theory]
     [InlineData(false, 4.5f)] [InlineData(true, 3f)]

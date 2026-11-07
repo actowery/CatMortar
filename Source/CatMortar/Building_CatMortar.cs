@@ -209,9 +209,26 @@ public sealed class Building_CatMortar : Building, IThingHolder
     private void QueueLaunch(IntVec3 targetCell, bool automatic)
     {
         if (!CanStartLaunch(targetCell, automatic)) return;
-        pendingTargetCell = targetCell;
+        pendingTargetCell = ApplyOperatorAccuracy(targetCell);
         pendingLaunchTick = Find.TickManager.TicksGame + CatMortarRules.MortarWarmupTicks;
         if (!automatic) Messages.Message("Cat mortar aiming: 4 seconds.", this, MessageTypeDefOf.NeutralEvent, false);
+    }
+
+    private IntVec3 ApplyOperatorAccuracy(IntVec3 intendedTarget)
+    {
+        if (Map is null) return intendedTarget;
+        var shootingLevel = ManningPawn?.skills?.GetSkill(SkillDefOf.Shooting)?.Level ?? 0;
+        var radius = CatMortarRules.CatShotDeviation(shootingLevel);
+        var ceiling = Mathf.CeilToInt(radius);
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var offsetX = Rand.RangeInclusive(-ceiling, ceiling);
+            var offsetZ = Rand.RangeInclusive(-ceiling, ceiling);
+            if (offsetX == 0 && offsetZ == 0 || offsetX * offsetX + offsetZ * offsetZ > radius * radius) continue;
+            var candidate = intendedTarget + new IntVec3(offsetX, 0, offsetZ);
+            if (candidate.InBounds(Map)) return candidate;
+        }
+        return intendedTarget;
     }
 
     private bool CanStartLaunch(IntVec3 targetCell, bool automatic)
@@ -257,7 +274,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (!HasLoadedCat) return inspect;
 
         var payloadInfo = IsCatMeat(LoadedThing!)
-            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: meat barrage — {CatMortarRules.CatMeatDamage(LoadedThing.stackCount)} damage, {CatMortarRules.CatMeatExplosionRadius(LoadedThing.stackCount):0.##}-tile radius\nMode: manual load only"
+            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across an {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage} meat slapped damage\nMode: manual load only"
             : $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
         return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }

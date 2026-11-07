@@ -20,7 +20,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [*][b]Orange:[/b] delayed fireburst. [b]Black:[/b] EMP, blind smoke, and a darkness overlay. [b]Cream:[/b] firefoam and a non-damaging stun pulse. [b]Brown:[/b] a scaled 6-tile anti-grain-style aftershock.
 [*]Living ammunition can survive: the exact cat lands safely outside the resolved blast with serious, non-vital injuries.
 [*]Colony cat corpses create a weaker 3-tile explosion and a toxic-gas cloud instead of a coat payload or survivor.
-[*]Cat meat makes a manual-load-only bloody barrage. Each extra piece increases damage, blast radius, and splatter; a full 20-meat round remains weaker than a cat corpse and has no toxic gas, coat payload, or survivor.
+[*]Cat meat makes a manual-load-only bloody barrage. Each loaded piece becomes one wildly scattered, direct-hit meat chunk across an 8-tile field: small [b]meat slapped[/b] damage, occasional brief stuns, light siege damage, and blood—but no normal explosion, toxic gas, coat payload, or survivor.
 [*]Mortar-style warmup, cooldown, forced targeting, auto-targeting, operator reloading, and vanilla minimum-range behavior.
 [*]No runtime dependencies.
 [/list]

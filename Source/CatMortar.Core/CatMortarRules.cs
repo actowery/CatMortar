@@ -33,12 +33,12 @@ public static class CatMortarRules
     public const int MinimumBloodCells = 12;
     public const int MaximumBloodCells = 20;
     public const int MaximumCatMeatPerShot = 20;
-    public const int MinimumCatMeatDamage = 6;
-    public const int MaximumCatMeatDamage = 25;
-    public const float MinimumCatMeatExplosionRadius = 0.825f;
-    public const float MaximumCatMeatExplosionRadius = 2.25f;
-    public const int MinimumCatMeatBloodCells = 4;
-    public const int MaximumCatMeatBloodCells = 14;
+    public const float CatMeatScatterRadius = 8f;
+    public const int CatMeatChunkDamage = 4;
+    public const float CatMeatStunChance = 0.20f;
+    public const int CatMeatStunTicks = 30;
+    public const float BestCatShotDeviation = 1.5f;
+    public const float WorstCatShotDeviation = 4f;
 
     public static CatCoatPayload PayloadFor(int coatIndex) => (CatCoatPayload)NormalizeCoatIndex(coatIndex);
 
@@ -68,22 +68,12 @@ public static class CatMortarRules
 
     public static int ClampCatMeatCount(int count) => Math.Min(MaximumCatMeatPerShot, Math.Max(1, count));
 
-    public static int CatMeatDamage(int count)
-    {
-        var bounded = ClampCatMeatCount(count);
-        return MinimumCatMeatDamage + (bounded - 1) * (MaximumCatMeatDamage - MinimumCatMeatDamage) / (MaximumCatMeatPerShot - 1);
-    }
+    public static int CatMeatChunkCount(int count) => ClampCatMeatCount(count);
 
-    public static float CatMeatExplosionRadius(int count)
+    public static float CatShotDeviation(int shootingLevel)
     {
-        var progress = (ClampCatMeatCount(count) - 1f) / (MaximumCatMeatPerShot - 1f);
-        return MinimumCatMeatExplosionRadius + (MaximumCatMeatExplosionRadius - MinimumCatMeatExplosionRadius) * progress;
-    }
-
-    public static int CatMeatBloodCellCount(int count)
-    {
-        var progress = (ClampCatMeatCount(count) - 1f) / (MaximumCatMeatPerShot - 1f);
-        return MinimumCatMeatBloodCells + (int)Math.Round((MaximumCatMeatBloodCells - MinimumCatMeatBloodCells) * progress, MidpointRounding.AwayFromZero);
+        var bounded = Math.Min(20, Math.Max(0, shootingLevel));
+        return WorstCatShotDeviation - (WorstCatShotDeviation - BestCatShotDeviation) * bounded / 20f;
     }
 
     public static int BloodCellCount(float roll)

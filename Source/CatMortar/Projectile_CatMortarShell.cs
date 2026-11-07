@@ -66,9 +66,7 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         switch (ammoType)
         {
             case CatMortarAmmoType.CatMeat:
-                var meatCount = CatMortarRules.ClampCatMeatCount(payload.stackCount);
-                GenExplosion.DoExplosion(cell, map, CatMortarRules.CatMeatExplosionRadius(meatCount), DamageDefOf.Bomb, Launcher, damAmount: CatMortarRules.CatMeatDamage(meatCount));
-                MakeBloodAndFragments(cell, map, CatMortarRules.CatMeatBloodCellCount(meatCount));
+                MakeCatMeatBarrage(cell, map, payload.stackCount);
                 break;
             case CatMortarAmmoType.CatCorpse:
                 GenExplosion.DoExplosion(cell, map, CatMortarRules.CorpseExplosionRadius, DamageDefOf.Bomb, Launcher);
@@ -127,6 +125,40 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
             FilthMaker.TryMakeFilth(target, map, ThingDefOf.Filth_Blood);
             if (index < 8) MoteMaker.MakeStaticMote(target.ToVector3(), map, DefDatabase<ThingDef>.GetNamed("Mote_CatMortarFragment"), 0.45f);
         }
+    }
+
+    // Meat is intentionally not an explosion.  Every loaded unit gets one small,
+    // independently scattered impact cell, keeping it situational rather than a
+    // second high-precision artillery shell.
+    private void MakeCatMeatBarrage(IntVec3 center, Map map, int stackCount)
+    {
+        var fragmentDef = DefDatabase<ThingDef>.GetNamed("Mote_CatMortarMeatFragment");
+        foreach (var _ in Enumerable.Range(0, CatMortarRules.CatMeatChunkCount(stackCount)))
+        {
+            var cell = RandomMeatImpactCell(center, map);
+            FilthMaker.TryMakeFilth(cell, map, ThingDefOf.Filth_Blood);
+            MoteMaker.MakeStaticMote(cell.ToVector3(), map, fragmentDef, 0.35f);
+
+            var pawn = cell.GetFirstPawn(map);
+            if (pawn is not null)
+            {
+                pawn.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, CatMortarRules.CatMeatChunkDamage, instigator: Launcher));
+                if (Rand.Chance(CatMortarRules.CatMeatStunChance))
+                    pawn.stances?.stunner?.StunFor(CatMortarRules.CatMeatStunTicks, Launcher, addBattleLog: true, showMote: true, disableRotation: false);
+                continue;
+            }
+
+            var edifice = cell.GetEdifice(map);
+            edifice?.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, CatMortarRules.CatMeatChunkDamage, instigator: Launcher));
+        }
+    }
+
+    private static IntVec3 RandomMeatImpactCell(IntVec3 center, Map map)
+    {
+        var candidates = GenRadial.RadialCellsAround(center, CatMortarRules.CatMeatScatterRadius, useCenter: true)
+            .Where(candidate => candidate.InBounds(map))
+            .ToList();
+        return candidates.Count > 0 ? candidates.RandomElement() : center;
     }
 
     private void ReleaseLivingCat(Pawn cat, IntVec3 center, Map map)

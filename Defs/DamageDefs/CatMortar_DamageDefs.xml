@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <DamageDef ParentName="BluntBase">
+    <defName>CatMortar_MeatSlap</defName>
+    <label>meat slapped</label>
+    <deathMessage>{0} was meat slapped to death.</deathMessage>
+    <defaultDamage>4</defaultDamage>
+    <defaultArmorPenetration>0.02</defaultArmorPenetration>
+    <buildingDamageFactor>1.5</buildingDamageFactor>
+    <bluntStunDuration>0</bluntStunDuration>
+  </DamageDef>
+</Defs>
