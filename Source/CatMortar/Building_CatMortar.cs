@@ -263,7 +263,9 @@ public sealed class Building_CatMortar : Building, IThingHolder
         var now = Find.TickManager.TicksGame;
         cooldownUntilTick = now + CatMortarRules.MortarCooldownTicks;
         pendingReloadPawn = ManningPawn;
-        reloadPending = pendingReloadPawn is not null;
+        // Meat is deliberately manual-only. It must never turn into an automatic
+        // colony-cat reload once the last chunk has been fired.
+        reloadPending = pendingReloadPawn is not null && !IsCatMeat(payload);
         nextAutoReloadAttemptTick = cooldownUntilTick;
     }
 
@@ -274,7 +276,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (!HasLoadedCat) return inspect;
 
         var payloadInfo = IsCatMeat(LoadedThing!)
-            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across an {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage} meat slapped damage\nMode: manual load only"
+            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across a {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage} meat slapped damage\nMode: manual load only"
             : $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
         return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }

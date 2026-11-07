@@ -132,7 +132,10 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
     // second high-precision artillery shell.
     private void MakeCatMeatBarrage(IntVec3 center, Map map, int stackCount)
     {
-        var fragmentDef = DefDatabase<ThingDef>.GetNamed("Mote_CatMortarMeatFragment");
+        // Mote_FoodBitMeat is a native, guaranteed-present meat visual. Using it
+        // avoids a second texture path that can break during Core asset changes.
+        var fragmentDef = DefDatabase<ThingDef>.GetNamed("Mote_FoodBitMeat");
+        DefDatabase<SoundDef>.GetNamed("BulletImpact_Flesh").PlayOneShot(new TargetInfo(center, map));
         foreach (var _ in Enumerable.Range(0, CatMortarRules.CatMeatChunkCount(stackCount)))
         {
             var cell = RandomMeatImpactCell(center, map);

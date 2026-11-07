@@ -33,7 +33,7 @@ public static class CatMortarRules
     public const int MinimumBloodCells = 12;
     public const int MaximumBloodCells = 20;
     public const int MaximumCatMeatPerShot = 20;
-    public const float CatMeatScatterRadius = 8f;
+    public const float CatMeatScatterRadius = 7f;
     public const int CatMeatChunkDamage = 4;
     public const float CatMeatStunChance = 0.20f;
     public const int CatMeatStunTicks = 30;
