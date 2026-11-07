@@ -71,7 +71,10 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "CatMortar.LoadCatMeat".Translate(),
             defaultDesc = "CatMortar.LoadCatMeatDesc".Translate(CatMortarRules.MaximumCatMeatPerShot),
             icon = TexCommand.Install,
-            targetingParams = new TargetingParameters { canTargetLocations = false, canTargetItems = true },
+            // Use RimWorld's stock all-thing targeting preset.  A hand-built
+            // item-only parameter set does not mark raw food stacks as targetable
+            // in the 1.7 selector, even though it reports canTargetItems.
+            targetingParams = TargetingParameters.ForThing(),
             action = target => TryOrderCatMeatLoad(target.Thing),
         };
         if (HasLoadedCat) loadMeatCommand.Disable("A cat is already loaded.");
