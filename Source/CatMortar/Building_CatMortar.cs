@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using RimWorld;
@@ -17,7 +18,11 @@ public sealed class Building_CatMortar : Building, IThingHolder
     private int nextAutoReloadAttemptTick;
     private IntVec3 pendingTargetCell;
     private bool autoTargeting;
+    private bool forcedTargeting;
+    private IntVec3 forcedTargetCell;
+    private Thing? forcedTargetThing;
     private bool reloadPending;
+    private bool reloadMeatPending;
     private Pawn? pendingReloadPawn;
 
     public Building_CatMortar() => innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
@@ -39,7 +44,11 @@ public sealed class Building_CatMortar : Building, IThingHolder
         Scribe_Values.Look(ref nextAutoReloadAttemptTick, "nextAutoReloadAttemptTick", 0);
         Scribe_Values.Look(ref pendingTargetCell, "pendingTargetCell");
         Scribe_Values.Look(ref autoTargeting, "autoTargeting", false);
+        Scribe_Values.Look(ref forcedTargeting, "forcedTargeting", false);
+        Scribe_Values.Look(ref forcedTargetCell, "forcedTargetCell");
+        Scribe_References.Look(ref forcedTargetThing, "forcedTargetThing");
         Scribe_Values.Look(ref reloadPending, "reloadPending", false);
+        Scribe_Values.Look(ref reloadMeatPending, "reloadMeatPending", false);
         Scribe_References.Look(ref pendingReloadPawn, "pendingReloadPawn");
         if (innerContainer is null) innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
     }
@@ -60,18 +69,32 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "Load cat",
             defaultDesc = "Designate one colony cat or cat corpse. The cat is suspended inside the mortar until fired.",
             icon = TexCommand.Install,
-            targetingParams = new TargetingParameters { canTargetPawns = true, canTargetItems = true, canTargetCorpses = true, validator = target => CanAccept(target.Thing) },
-            action = target => OrderLoad(target.Thing),
+            targetingParams = new TargetingParameters { canTargetLocations = false, canTargetPawns = true, canTargetAnimals = true, canTargetCorpses = true },
+            action = target => TryOrderCatLoad(target.Thing),
         };
         if (HasLoadedCat) loadCommand.Disable("A cat is already loaded.");
         yield return loadCommand;
+        var loadMeatCommand = new Command_Target
+        {
+            defaultLabel = "CatMortar.LoadCatMeat".Translate(),
+            defaultDesc = "CatMortar.LoadCatMeatDesc".Translate(CatMortarRules.MaximumCatMeatPerShot),
+            icon = TexCommand.Install,
+            // Use RimWorld's stock all-thing targeting preset.  A hand-built
+            // item-only parameter set does not mark raw food stacks as targetable
+            // in the 1.7 selector, even though it reports canTargetItems.
+            targetingParams = TargetingParameters.ForThing(),
+            action = target => TryOrderCatMeatLoad(target.Thing),
+        };
+        if (HasLoadedCat) loadMeatCommand.Disable("A cat is already loaded.");
+        yield return loadMeatCommand;
         var fireCommand = new Command_Target
         {
             defaultLabel = "Force target",
-            defaultDesc = "Aim the loaded cat like a mortar. Targets inside the red dead zone are rejected.",
+            defaultDesc = "Aim the loaded cat like a mortar. Hotkey: N (rebindable under Controls > Misc 4). Targets inside the red dead zone are rejected.",
             icon = TexCommand.Attack,
+            hotKey = KeyBindingDefOf.Misc4,
             targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = true, canTargetBuildings = true, canTargetItems = true },
-            action = target => QueueLaunch(target.Cell, false),
+            action = SetForcedTarget,
         };
         if (!HasLoadedCat) fireCommand.Disable("Load a colony cat or cat corpse first.");
         else if (!IsManned) fireCommand.Disable("A colonist must man the cat mortar.");
@@ -79,6 +102,26 @@ public sealed class Building_CatMortar : Building, IThingHolder
         else if (LaunchPending) fireCommand.Disable("The cat mortar is aiming.");
         else if (CoolingDown) fireCommand.Disable("The cat mortar is cooling down.");
         yield return fireCommand;
+
+        var clearTargetCommand = new Command_Action
+        {
+            defaultLabel = "Clear forced target",
+            defaultDesc = "Stop repeating fire at the forced pawn or structure target. Any shot already in its aiming warmup is cancelled.",
+            icon = TexCommand.ClearPrioritizedWork,
+            action = () => ClearForcedTarget(showMessage: true),
+        };
+        if (!forcedTargeting) clearTargetCommand.Disable("No forced pawn or structure target is locked.");
+        yield return clearTargetCommand;
+
+        var unloadCommand = new Command_Action
+        {
+            defaultLabel = "Waste loaded ammunition",
+            defaultDesc = "Permanently destroy the loaded cat, corpse, or cat meat. This cancels automatic reload and tells the current operator to stand down.",
+            icon = TexCommand.ClearPrioritizedWork,
+            action = WasteLoadedAmmunition,
+        };
+        if (!HasLoadedCat) unloadCommand.Disable("No ammunition is loaded.");
+        yield return unloadCommand;
 
         yield return new Command_Toggle
         {
@@ -93,8 +136,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
     public bool CanAccept(Thing thing)
     {
         if (thing is null || HasLoadedCat) return false;
-        if (thing is Pawn pawn) return pawn.def.defName == "Cat" && pawn.Faction == Faction.OfPlayer && !pawn.Dead;
-        return thing is Corpse corpse && corpse.InnerPawn?.def?.defName == "Cat" && corpse.InnerPawn.Faction == Faction.OfPlayer;
+        return IsLivingCatOrCorpse(thing) || IsCatMeat(thing);
     }
 
     public bool TryAccept(Thing thing)
@@ -106,27 +148,57 @@ public sealed class Building_CatMortar : Building, IThingHolder
         return true;
     }
 
-    public bool OrderLoad(Thing target, Pawn? preferredHauler = null)
+    public bool OrderLoad(Thing target, int count = 1, Pawn? preferredHauler = null)
     {
         if (!CanAccept(target) || Map is null) return false;
-        var hauler = preferredHauler is not null
-            && preferredHauler.Spawned
-            && preferredHauler.CanReserve(target)
-            && preferredHauler.CanReserve(this)
-            && preferredHauler.CanReach(target, PathEndMode.Touch, Danger.Some)
-            ? preferredHauler
-            : Map.mapPawns.FreeColonistsSpawned
-            .Where(pawn => pawn.CanReserve(target) && pawn.CanReserve(this) && pawn.CanReach(target, PathEndMode.Touch, Danger.Some))
-            .OrderBy(pawn => pawn.Position.DistanceToSquared(target.Position)).FirstOrDefault();
+        var candidates = new List<Pawn>();
+        if (preferredHauler is not null) candidates.Add(preferredHauler);
+        if (ManningPawn is not null && !candidates.Contains(ManningPawn)) candidates.Add(ManningPawn);
+        candidates.AddRange(Map.mapPawns.FreeColonistsSpawned
+            .Where(pawn => !candidates.Contains(pawn))
+            .OrderBy(pawn => pawn.Position.DistanceToSquared(target.Position)));
+        // A manning pawn already reserves the mortar. Its newly ordered load job
+        // replaces manning and then obtains the normal job reservation, so do not
+        // reject it merely because the building is currently reserved.
+        var hauler = candidates.FirstOrDefault(pawn => pawn.Spawned
+            && !pawn.Dead
+            && pawn.CanReserve(target)
+            && pawn.CanReach(target, PathEndMode.Touch, Danger.Some)
+            && pawn.CanReach(this, PathEndMode.Touch, Danger.Some));
         if (hauler is null)
         {
-            if (preferredHauler is null) Messages.Message("No colonist can load that cat.", this, MessageTypeDefOf.RejectInput, false);
+            if (preferredHauler is null) Messages.Message("No colonist can reach and load that ammunition.", this, MessageTypeDefOf.RejectInput, false);
             return false;
         }
         var job = JobMaker.MakeJob(CatMortarDefOf.CatMortar_Load, target, this);
-        job.count = 1;
-        hauler.jobs.TryTakeOrderedJob(job);
+        job.count = Math.Min(Math.Max(1, count), target.stackCount);
+        if (!hauler.jobs.TryTakeOrderedJob(job))
+        {
+            Messages.Message("The selected colonist could not start loading the cat mortar.", this, MessageTypeDefOf.RejectInput, false);
+            return false;
+        }
+        Messages.Message($"{hauler.LabelShortCap} is loading {job.count} {target.LabelCap}.", this, MessageTypeDefOf.NeutralEvent, false);
         return true;
+    }
+
+    private void TryOrderCatLoad(Thing? target)
+    {
+        if (target is null || !IsLivingCatOrCorpse(target))
+        {
+            Messages.Message("Select a colony cat or colony cat corpse.", this, MessageTypeDefOf.RejectInput, false);
+            return;
+        }
+        OrderLoad(target);
+    }
+
+    private void TryOrderCatMeatLoad(Thing? target)
+    {
+        if (target is null || !IsCatMeat(target))
+        {
+            Messages.Message("Select vanilla cat meat (Meat_Cat), not another animal's meat.", this, MessageTypeDefOf.RejectInput, false);
+            return;
+        }
+        OrderLoad(target, Math.Min(CatMortarRules.MaximumCatMeatPerShot, target.stackCount));
     }
 
     protected override void Tick()
@@ -142,7 +214,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
         }
 
         if (reloadPending && !HasLoadedCat && !LaunchPending && now >= nextAutoReloadAttemptTick) TryOperatorReload(now);
-        if (autoTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueAutoTarget();
+        if (forcedTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueForcedTarget();
+        else if (autoTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueAutoTarget();
     }
 
     public override void DrawExtraSelectionOverlays()
@@ -166,9 +239,65 @@ public sealed class Building_CatMortar : Building, IThingHolder
     private void QueueLaunch(IntVec3 targetCell, bool automatic)
     {
         if (!CanStartLaunch(targetCell, automatic)) return;
-        pendingTargetCell = targetCell;
+        pendingTargetCell = ApplyOperatorAccuracy(targetCell);
         pendingLaunchTick = Find.TickManager.TicksGame + CatMortarRules.MortarWarmupTicks;
         if (!automatic) Messages.Message("Cat mortar aiming: 4 seconds.", this, MessageTypeDefOf.NeutralEvent, false);
+    }
+
+    private void SetForcedTarget(LocalTargetInfo target)
+    {
+        if (!CanStartLaunch(target.Cell, automatic: false)) return;
+
+        // Vanilla-style repeated fire is meaningful for a real pawn or building.
+        // A deliberately selected empty cell remains a one-shot bombardment.
+        forcedTargetThing = target.Thing;
+        forcedTargetCell = target.Cell;
+        forcedTargeting = forcedTargetThing is not null;
+        QueueLaunch(target.Cell, automatic: false);
+    }
+
+    private void TryQueueForcedTarget()
+    {
+        if (!TryGetForcedTargetCell(out var targetCell))
+        {
+            ClearForcedTarget(showMessage: false);
+            return;
+        }
+        QueueLaunch(targetCell, automatic: true);
+    }
+
+    private bool TryGetForcedTargetCell(out IntVec3 targetCell)
+    {
+        targetCell = forcedTargetCell;
+        if (forcedTargetThing is null || forcedTargetThing.Destroyed || !forcedTargetThing.Spawned) return false;
+        if (forcedTargetThing is Pawn pawn && pawn.Dead) return false;
+        targetCell = forcedTargetThing.Position;
+        return targetCell.InBounds(Map);
+    }
+
+    private void ClearForcedTarget(bool showMessage)
+    {
+        forcedTargeting = false;
+        forcedTargetThing = null;
+        pendingLaunchTick = -1;
+        if (showMessage) Messages.Message("Cat mortar forced target cleared.", this, MessageTypeDefOf.NeutralEvent, false);
+    }
+
+    private IntVec3 ApplyOperatorAccuracy(IntVec3 intendedTarget)
+    {
+        if (Map is null) return intendedTarget;
+        var shootingLevel = ManningPawn?.skills?.GetSkill(SkillDefOf.Shooting)?.Level ?? 0;
+        var radius = CatMortarRules.CatShotDeviation(shootingLevel);
+        var ceiling = Mathf.CeilToInt(radius);
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var offsetX = Rand.RangeInclusive(-ceiling, ceiling);
+            var offsetZ = Rand.RangeInclusive(-ceiling, ceiling);
+            if (offsetX == 0 && offsetZ == 0 || offsetX * offsetX + offsetZ * offsetZ > radius * radius) continue;
+            var candidate = intendedTarget + new IntVec3(offsetX, 0, offsetZ);
+            if (candidate.InBounds(Map)) return candidate;
+        }
+        return intendedTarget;
     }
 
     private bool CanStartLaunch(IntVec3 targetCell, bool automatic)
@@ -198,11 +327,14 @@ public sealed class Building_CatMortar : Building, IThingHolder
         loadedCoatIndex = -1;
         GenSpawn.Spawn(shell, Position, Map);
         DefDatabase<SoundDef>.GetNamed("Mortar_LaunchA").PlayOneShot(new TargetInfo(Position, Map));
-        DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
+        if (!IsCatMeat(payload)) DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
         shell.Launch(this, DrawPos, new LocalTargetInfo(targetCell), new LocalTargetInfo(targetCell), ProjectileHitFlags.IntendedTarget, false, null);
         var now = Find.TickManager.TicksGame;
         cooldownUntilTick = now + CatMortarRules.MortarCooldownTicks;
         pendingReloadPawn = ManningPawn;
+        // Preserve the ammunition mode: a meat volley seeks more meat, never an
+        // unsuspecting colony cat after the meat stack runs out.
+        reloadMeatPending = IsCatMeat(payload);
         reloadPending = pendingReloadPawn is not null;
         nextAutoReloadAttemptTick = cooldownUntilTick;
     }
@@ -213,7 +345,9 @@ public sealed class Building_CatMortar : Building, IThingHolder
         var inspect = base.GetInspectString();
         if (!HasLoadedCat) return inspect;
 
-        var payloadInfo = $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
+        var payloadInfo = IsCatMeat(LoadedThing!)
+            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across a {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage(LoadedThing.stackCount)} meat slapped damage with {CatMortarRules.CatMeatStunChance(LoadedThing.stackCount):P0} brief-stun chance\nMode: auto-reload cat meat"
+            : $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
         return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }
 
@@ -234,11 +368,42 @@ public sealed class Building_CatMortar : Building, IThingHolder
             reloadPending = false;
             return;
         }
+        if (reloadMeatPending)
+        {
+            var meat = Map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+                .Where(IsCatMeat)
+                .OrderBy(thing => Position.DistanceToSquared(thing.Position))
+                .FirstOrDefault();
+            if (meat is not null && OrderLoad(meat, Math.Min(CatMortarRules.MaximumCatMeatPerShot, meat.stackCount), pendingReloadPawn)) reloadPending = false;
+            return;
+        }
+
         var cat = Map.mapPawns.AllPawnsSpawned
             .Where(IsAutomaticAmmoCat)
             .OrderBy(pawn => Position.DistanceToSquared(pawn.Position))
             .FirstOrDefault();
-        if (cat is not null && OrderLoad(cat, pendingReloadPawn)) reloadPending = false;
+        if (cat is not null && OrderLoad(cat, preferredHauler: pendingReloadPawn)) reloadPending = false;
+    }
+
+    private void WasteLoadedAmmunition()
+    {
+        var payload = LoadedThing;
+        if (payload is null) return;
+
+        innerContainer.Remove(payload);
+        payload.Destroy(DestroyMode.Vanish);
+        loadedCoatIndex = -1;
+        pendingLaunchTick = -1;
+        reloadPending = false;
+        reloadMeatPending = false;
+        nextAutoReloadAttemptTick = 0;
+        autoTargeting = false;
+        forcedTargeting = false;
+        forcedTargetThing = null;
+        var operatorPawn = ManningPawn;
+        pendingReloadPawn = null;
+        operatorPawn?.jobs?.EndCurrentJob(JobCondition.InterruptForced);
+        Messages.Message("Loaded cat mortar ammunition was wasted. The operator has stood down.", this, MessageTypeDefOf.NegativeEvent, false);
     }
 
     private static bool IsAutomaticAmmoCat(Pawn pawn) => pawn.def.defName == "Cat"
@@ -248,12 +413,24 @@ public sealed class Building_CatMortar : Building, IThingHolder
         && !pawn.Downed
         && pawn.relations?.DirectRelations?.All(relation => relation.def != PawnRelationDefOf.Bond) == true;
 
+    private static bool IsLivingCatOrCorpse(Thing? thing)
+    {
+        if (thing is Pawn pawn) return pawn.def.defName == "Cat" && pawn.Faction == Faction.OfPlayer && !pawn.Dead;
+        return thing is Corpse corpse && corpse.InnerPawn?.def?.defName == "Cat" && corpse.InnerPawn.Faction == Faction.OfPlayer;
+    }
+
+    private static bool IsCatMeat(Thing? thing) => thing is not null
+        && CatMortarRules.IsEligibleCatMeat(thing.def.IsMeat, thing.def.defName == "Meat_Cat");
+
     public override void Destroy(DestroyMode mode = DestroyMode.Vanish)
     {
         if (Spawned && innerContainer?.Any == true) innerContainer.TryDropAll(Position, Map, ThingPlaceMode.Near);
         loadedCoatIndex = -1;
         pendingLaunchTick = -1;
+        forcedTargeting = false;
+        forcedTargetThing = null;
         reloadPending = false;
+        reloadMeatPending = false;
         pendingReloadPawn = null;
         base.Destroy(mode);
     }

@@ -42,9 +42,16 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
     protected override void DrawAt(Vector3 drawLoc, bool flip = false)
     {
         InitializeVisuals();
+        var payload = payloadContainer.FirstOrDefault();
+        var rotationDegrees = CatMortarRules.FlightRotation(visualFacing, spinDirection, Find.TickManager.TicksGame - firstDrawTick);
+        if (IsCatMeat(payload))
+        {
+            payload!.Graphic.Draw(drawLoc, new Rot4(visualFacing), payload, rotationDegrees);
+            return;
+        }
         var color = coatIndex >= 0 ? CatMortarVisuals.ColorFor(coatIndex) : Color.gray;
         var graphic = GraphicDatabase.Get<Graphic_Multi>("Things/Pawn/Animal/Cat/Cat", ShaderDatabase.Cutout, new Vector2(CatMortarRules.FlightScale, CatMortarRules.FlightScale), color);
-        var rotation = Quaternion.AngleAxis(CatMortarRules.FlightRotation(visualFacing, spinDirection, Find.TickManager.TicksGame - firstDrawTick), Vector3.up);
+        var rotation = Quaternion.AngleAxis(rotationDegrees, Vector3.up);
         Graphics.DrawMesh(MeshPool.plane10, drawLoc, rotation, graphic.MatAt(new Rot4(visualFacing)), 0);
     }
 
@@ -55,15 +62,25 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         var payload = payloadContainer.FirstOrDefault();
         if (map is null || payload is null) { Destroy(); return; }
 
-        var corpsePayload = payload is Corpse;
-        GenExplosion.DoExplosion(cell, map, CatMortarRules.ExplosionRadius(corpsePayload), DamageDefOf.Bomb, Launcher);
-        DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Death").PlayOneShot(new TargetInfo(cell, map));
-        MakeBloodAndFragments(cell, map);
-        if (corpsePayload) MakeToxicCloud(cell, map);
-        else
+        var ammoType = CatMortarRules.AmmoTypeFor(payload is Pawn, payload is Corpse, IsCatMeat(payload));
+        switch (ammoType)
         {
-            ApplyCoatPayload(cell, map, CatMortarRules.PayloadFor(coatIndex));
-            if (payload is Pawn cat) ReleaseLivingCat(cat, cell, map);
+            case CatMortarAmmoType.CatMeat:
+                MakeCatMeatBarrage(cell, map, payload.stackCount);
+                break;
+            case CatMortarAmmoType.CatCorpse:
+                GenExplosion.DoExplosion(cell, map, CatMortarRules.CorpseExplosionRadius, DamageDefOf.Bomb, Launcher);
+                DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Death").PlayOneShot(new TargetInfo(cell, map));
+                MakeBloodAndFragments(cell, map, CatMortarRules.BloodCellCount(Rand.Value));
+                MakeToxicCloud(cell, map);
+                break;
+            case CatMortarAmmoType.LivingCat:
+                GenExplosion.DoExplosion(cell, map, CatMortarRules.LivingExplosionRadius, DamageDefOf.Bomb, Launcher);
+                DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Death").PlayOneShot(new TargetInfo(cell, map));
+                MakeBloodAndFragments(cell, map, CatMortarRules.BloodCellCount(Rand.Value));
+                ApplyCoatPayload(cell, map, CatMortarRules.PayloadFor(coatIndex));
+                ReleaseLivingCat((Pawn)payload, cell, map);
+                break;
         }
         Destroy();
     }
@@ -98,16 +115,58 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         foreach (var gasCell in GenRadial.RadialCellsAround(cell, 5f, true)) if (gasCell.InBounds(map)) GasUtility.AddGas(gasCell, map, GasType.ToxGas, 180);
     }
 
-    private static void MakeBloodAndFragments(IntVec3 cell, Map map)
+    private static void MakeBloodAndFragments(IntVec3 cell, Map map, int bloodCellCount)
     {
         FilthMaker.TryMakeFilth(cell, map, ThingDefOf.Filth_Blood);
-        for (var index = 0; index < CatMortarRules.BloodCellCount(Rand.Value); index++)
+        for (var index = 0; index < bloodCellCount; index++)
         {
             var target = cell + new IntVec3(Rand.RangeInclusive(-5, 5), 0, Rand.RangeInclusive(-5, 5));
             if (!target.InBounds(map)) continue;
             FilthMaker.TryMakeFilth(target, map, ThingDefOf.Filth_Blood);
             if (index < 8) MoteMaker.MakeStaticMote(target.ToVector3(), map, DefDatabase<ThingDef>.GetNamed("Mote_CatMortarFragment"), 0.45f);
         }
+    }
+
+    // Meat is intentionally not an explosion.  Every loaded unit gets one small,
+    // independently scattered impact cell, keeping it situational rather than a
+    // second high-precision artillery shell.
+    private void MakeCatMeatBarrage(IntVec3 center, Map map, int stackCount)
+    {
+        // Mote_FoodBitMeat is a native, guaranteed-present meat visual. Using it
+        // avoids a second texture path that can break during Core asset changes.
+        var fragmentDef = DefDatabase<ThingDef>.GetNamed("Mote_FoodBitMeat");
+        // A layered, deliberately non-animal impact: fleshy splat plus a heavy
+        // blunt thump. No cat vocalization is used for a meat barrage.
+        DefDatabase<SoundDef>.GetNamed("BulletImpact_Flesh").PlayOneShot(new TargetInfo(center, map));
+        DefDatabase<SoundDef>.GetNamed("Pawn_Melee_BigBash_HitPawn").PlayOneShot(new TargetInfo(center, map));
+        var chunkDamage = CatMortarRules.CatMeatChunkDamage(stackCount);
+        var stunChance = CatMortarRules.CatMeatStunChance(stackCount);
+        foreach (var _ in Enumerable.Range(0, CatMortarRules.CatMeatChunkCount(stackCount)))
+        {
+            var cell = RandomMeatImpactCell(center, map);
+            FilthMaker.TryMakeFilth(cell, map, ThingDefOf.Filth_Blood);
+            MoteMaker.MakeStaticMote(cell.ToVector3(), map, fragmentDef, 0.35f);
+
+            var pawn = cell.GetFirstPawn(map);
+            if (pawn is not null)
+            {
+                pawn.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, chunkDamage, instigator: Launcher));
+                if (Rand.Chance(stunChance))
+                    pawn.stances?.stunner?.StunFor(CatMortarRules.CatMeatStunTicks, Launcher, addBattleLog: true, showMote: true, disableRotation: false);
+                continue;
+            }
+
+            var edifice = cell.GetEdifice(map);
+            edifice?.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, chunkDamage, instigator: Launcher));
+        }
+    }
+
+    private static IntVec3 RandomMeatImpactCell(IntVec3 center, Map map)
+    {
+        var candidates = GenRadial.RadialCellsAround(center, CatMortarRules.CatMeatScatterRadius, useCenter: true)
+            .Where(candidate => candidate.InBounds(map))
+            .ToList();
+        return candidates.Count > 0 ? candidates.RandomElement() : center;
     }
 
     private void ReleaseLivingCat(Pawn cat, IntVec3 center, Map map)
@@ -132,10 +191,12 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         if (visualFacing < 0) visualFacing = Rand.RangeInclusive(0, 3);
         if (spinDirection == 0) spinDirection = Rand.Bool ? 1 : -1;
         if (firstDrawTick < 0) firstDrawTick = Find.TickManager.TicksGame;
-        if (!launchSoundPlayed && Map is not null)
-        {
-            DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
-            launchSoundPlayed = true;
-        }
+        // Launch audio is emitted by the mortar, which knows whether its payload
+        // is cat meat. Keep the visual initializer silent so a slow first draw
+        // cannot make a launch meow appear to happen at impact.
+        launchSoundPlayed = true;
     }
+
+    private static bool IsCatMeat(Thing? thing) => thing is not null
+        && CatMortarRules.IsEligibleCatMeat(thing.def.IsMeat, thing.def.defName == "Meat_Cat");
 }

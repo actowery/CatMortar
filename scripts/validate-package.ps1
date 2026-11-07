@@ -6,9 +6,11 @@ $aboutPath = Join-Path $RepositoryRoot 'About\About.xml'
 $defsPath = Join-Path $RepositoryRoot 'Defs\ThingDefs\CatMortar.xml'
 $coatsPath = Join-Path $RepositoryRoot 'Defs\HediffDefs\CatMortar_LaunchCoats.xml'
 $jobsPath = Join-Path $RepositoryRoot 'Defs\JobDefs\CatMortar_Jobs.xml'
+$damageDefsPath = Join-Path $RepositoryRoot 'Defs\DamageDefs\CatMortar_DamageDefs.xml'
 $previewPath = Join-Path $RepositoryRoot 'About\Preview.png'
 $loadFoldersPath = Join-Path $RepositoryRoot 'LoadFolders.xml'
 [xml]$about = Get-Content -Raw $aboutPath; [xml]$defs = Get-Content -Raw $defsPath; [xml]$coats = Get-Content -Raw $coatsPath; [xml]$loadFolders = Get-Content -Raw $loadFoldersPath
+[xml]$damageDefs = Get-Content -Raw $damageDefsPath
 
 Assert-Condition ($about.ModMetaData.packageId -eq 'konduct.catmortar') 'Unexpected package ID.'
 Assert-Condition (@($about.ModMetaData.supportedVersions.li) -contains '1.6') 'RimWorld 1.6 missing.'
@@ -26,6 +28,7 @@ Assert-Condition (($defs.Defs.ThingDef | Where-Object { $_.defName -eq 'Building
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Minified_CatMortar') 'Compact cat mortar definition missing.'
 Assert-Condition ($defs.Defs.ThingDef.defName -contains 'Projectile_CatMortarShell') 'Projectile definition missing.'
 Assert-Condition (Test-Path $jobsPath) 'Cat loading job definition missing.'
+Assert-Condition ($damageDefs.Defs.DamageDef.defName -contains 'CatMortar_MeatSlap') 'Cat meat direct-hit damage definition missing.'
 Assert-Condition (-not ((Get-Content -Raw $jobsPath) -match 'checkOverrideOnExpire')) 'Removed RimWorld job field must not return.'
 Assert-Condition (@($coats.Defs.HediffDef).Count -eq 4) 'Expected four launch coat definitions.'
 Assert-Condition (@($coats.Defs.HediffDef | Where-Object { $_.description -and $_.skinColorOverride }).Count -eq 4) 'Launch coats need descriptions and native skin-color overrides.'

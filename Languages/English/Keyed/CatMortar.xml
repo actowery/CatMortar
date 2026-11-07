@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LanguageData><CatMortar.LoadCat>Load cat</CatMortar.LoadCat><CatMortar.FireLoadedCat>Fire loaded cat</CatMortar.FireLoadedCat></LanguageData>
+<LanguageData><CatMortar.LoadCat>Load cat</CatMortar.LoadCat><CatMortar.LoadCatMeat>Load cat meat</CatMortar.LoadCatMeat><CatMortar.LoadCatMeatDesc>Load up to {0} cat meat. More meat makes a larger, bloodier blast; cat meat rounds never receive a coat payload or toxic gas.</CatMortar.LoadCatMeatDesc><CatMortar.FireLoadedCat>Fire loaded cat</CatMortar.FireLoadedCat></LanguageData>

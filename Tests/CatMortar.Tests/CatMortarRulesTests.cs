@@ -17,6 +17,36 @@ public sealed class CatMortarRulesTests
     public void Only_colony_cats_are_valid_ammunition(bool isCat, bool playerFaction, bool isCorpse, bool expected) => Assert.Equal(expected, CatMortarRules.IsEligibleCat(isCat, playerFaction, isCorpse));
 
     [Theory]
+    [InlineData(true, true, true)] [InlineData(true, false, false)] [InlineData(false, true, false)]
+    public void Only_cat_sourced_meat_is_valid_meat_ammunition(bool isMeat, bool hasCatSource, bool expected) => Assert.Equal(expected, CatMortarRules.IsEligibleCatMeat(isMeat, hasCatSource));
+
+    [Theory]
+    [InlineData(true, false, false, CatMortarAmmoType.LivingCat)] [InlineData(false, true, false, CatMortarAmmoType.CatCorpse)] [InlineData(false, false, true, CatMortarAmmoType.CatMeat)] [InlineData(false, false, false, CatMortarAmmoType.Unknown)]
+    public void Ammunition_kinds_are_kept_distinct(bool livingCat, bool catCorpse, bool catMeat, CatMortarAmmoType expected) => Assert.Equal(expected, CatMortarRules.AmmoTypeFor(livingCat, catCorpse, catMeat));
+
+    [Theory]
+    [InlineData(0, 1)] [InlineData(1, 1)] [InlineData(5, 5)] [InlineData(20, 20)] [InlineData(99, 20)]
+    public void Cat_meat_turns_each_loaded_piece_into_one_scatter_chunk(int count, int expectedChunkCount)
+    {
+        Assert.Equal(expectedChunkCount, CatMortarRules.ClampCatMeatCount(count));
+        Assert.Equal(expectedChunkCount, CatMortarRules.CatMeatChunkCount(count));
+    }
+
+    [Fact]
+    public void Cat_meat_barrage_has_a_seven_tile_direct_hit_scatter_field()
+    {
+        Assert.Equal(7f, CatMortarRules.CatMeatScatterRadius);
+        Assert.Equal(4, CatMortarRules.CatMeatChunkDamage(1));
+        Assert.Equal(7, CatMortarRules.CatMeatChunkDamage(20));
+        Assert.Equal(0.15f, CatMortarRules.CatMeatStunChance(1), 3);
+        Assert.Equal(0.35f, CatMortarRules.CatMeatStunChance(20), 3);
+    }
+
+    [Theory]
+    [InlineData(-1, 4f)] [InlineData(0, 4f)] [InlineData(10, 2.75f)] [InlineData(20, 1.5f)] [InlineData(99, 1.5f)]
+    public void Cat_shots_always_have_small_operator_scaled_imperfection(int shootingLevel, float expectedDeviation) => Assert.Equal(expectedDeviation, CatMortarRules.CatShotDeviation(shootingLevel), 3);
+
+    [Theory]
     [InlineData(false, 4.5f)] [InlineData(true, 3f)]
     public void Corpse_ammunition_uses_a_degraded_blast(bool corpse, float expected) => Assert.Equal(expected, CatMortarRules.ExplosionRadius(corpse));
 
