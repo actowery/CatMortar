@@ -136,6 +136,8 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         // avoids a second texture path that can break during Core asset changes.
         var fragmentDef = DefDatabase<ThingDef>.GetNamed("Mote_FoodBitMeat");
         DefDatabase<SoundDef>.GetNamed("BulletImpact_Flesh").PlayOneShot(new TargetInfo(center, map));
+        var chunkDamage = CatMortarRules.CatMeatChunkDamage(stackCount);
+        var stunChance = CatMortarRules.CatMeatStunChance(stackCount);
         foreach (var _ in Enumerable.Range(0, CatMortarRules.CatMeatChunkCount(stackCount)))
         {
             var cell = RandomMeatImpactCell(center, map);
@@ -145,14 +147,14 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
             var pawn = cell.GetFirstPawn(map);
             if (pawn is not null)
             {
-                pawn.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, CatMortarRules.CatMeatChunkDamage, instigator: Launcher));
-                if (Rand.Chance(CatMortarRules.CatMeatStunChance))
+                pawn.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, chunkDamage, instigator: Launcher));
+                if (Rand.Chance(stunChance))
                     pawn.stances?.stunner?.StunFor(CatMortarRules.CatMeatStunTicks, Launcher, addBattleLog: true, showMote: true, disableRotation: false);
                 continue;
             }
 
             var edifice = cell.GetEdifice(map);
-            edifice?.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, CatMortarRules.CatMeatChunkDamage, instigator: Launcher));
+            edifice?.TakeDamage(new DamageInfo(CatMortarDefOf.CatMortar_MeatSlap, chunkDamage, instigator: Launcher));
         }
     }
 

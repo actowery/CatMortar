@@ -276,7 +276,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (!HasLoadedCat) return inspect;
 
         var payloadInfo = IsCatMeat(LoadedThing!)
-            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across a {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage} meat slapped damage\nMode: manual load only"
+            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across a {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage(LoadedThing.stackCount)} meat slapped damage with {CatMortarRules.CatMeatStunChance(LoadedThing.stackCount):P0} brief-stun chance\nMode: manual load only"
             : $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
         return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }

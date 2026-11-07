@@ -36,8 +36,10 @@ public sealed class CatMortarRulesTests
     public void Cat_meat_barrage_has_a_seven_tile_direct_hit_scatter_field()
     {
         Assert.Equal(7f, CatMortarRules.CatMeatScatterRadius);
-        Assert.Equal(4, CatMortarRules.CatMeatChunkDamage);
-        Assert.InRange(CatMortarRules.CatMeatStunChance, 0.19f, 0.21f);
+        Assert.Equal(4, CatMortarRules.CatMeatChunkDamage(1));
+        Assert.Equal(7, CatMortarRules.CatMeatChunkDamage(20));
+        Assert.Equal(0.15f, CatMortarRules.CatMeatStunChance(1), 3);
+        Assert.Equal(0.35f, CatMortarRules.CatMeatStunChance(20), 3);
     }
 
     [Theory]

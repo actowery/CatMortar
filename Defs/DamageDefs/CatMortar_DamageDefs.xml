@@ -6,7 +6,7 @@
     <deathMessage>{0} was meat slapped to death.</deathMessage>
     <defaultDamage>4</defaultDamage>
     <defaultArmorPenetration>0.02</defaultArmorPenetration>
-    <buildingDamageFactor>1.5</buildingDamageFactor>
+    <buildingDamageFactor>1.75</buildingDamageFactor>
     <bluntStunDuration>0</bluntStunDuration>
   </DamageDef>
 </Defs>

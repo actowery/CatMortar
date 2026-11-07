@@ -34,8 +34,10 @@ public static class CatMortarRules
     public const int MaximumBloodCells = 20;
     public const int MaximumCatMeatPerShot = 20;
     public const float CatMeatScatterRadius = 7f;
-    public const int CatMeatChunkDamage = 4;
-    public const float CatMeatStunChance = 0.20f;
+    public const int MinimumCatMeatChunkDamage = 4;
+    public const int MaximumCatMeatChunkDamage = 7;
+    public const float MinimumCatMeatStunChance = 0.15f;
+    public const float MaximumCatMeatStunChance = 0.35f;
     public const int CatMeatStunTicks = 30;
     public const float BestCatShotDeviation = 1.5f;
     public const float WorstCatShotDeviation = 4f;
@@ -69,6 +71,17 @@ public static class CatMortarRules
     public static int ClampCatMeatCount(int count) => Math.Min(MaximumCatMeatPerShot, Math.Max(1, count));
 
     public static int CatMeatChunkCount(int count) => ClampCatMeatCount(count);
+
+    // More meat still means more scattered chunks, but each chunk also hits a
+    // little harder. A full rack is worthwhile without becoming a precision
+    // substitute for a corpse or live-cat shell.
+    public static int CatMeatChunkDamage(int count) => MinimumCatMeatChunkDamage
+        + (ClampCatMeatCount(count) - 1) * (MaximumCatMeatChunkDamage - MinimumCatMeatChunkDamage)
+        / (MaximumCatMeatPerShot - 1);
+
+    public static float CatMeatStunChance(int count) => MinimumCatMeatStunChance
+        + (ClampCatMeatCount(count) - 1) * (MaximumCatMeatStunChance - MinimumCatMeatStunChance)
+        / (MaximumCatMeatPerShot - 1);
 
     public static float CatShotDeviation(int shootingLevel)
     {
