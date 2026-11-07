@@ -31,7 +31,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [list]
 [*]Requires Mortars research.
 [*]Costs 350 steel, 25 components, and 100 chemfuel.
-[*]Loading a cat is a commitment until firing or destruction of the mortar; destroying a loaded mortar releases a living cat or drops the corpse.
+[*]Loading a cat is a commitment until firing, **Waste loaded ammunition**, or destruction of the mortar; destroying a loaded mortar releases a living cat or drops the corpse.
 [*]The mortar cannot fire while roofed.
 [/list]
 
@@ -45,7 +45,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [h2]Links[/h2]
 [url=https://github.com/actowery/CatMortar]Source code and issue tracker[/url]
 
-[url=https://github.com/actowery/CatMortar/releases/tag/v1.0.2]Latest release and direct download[/url]
+[url=https://github.com/actowery/CatMortar/releases/latest]Latest release and direct download[/url]
 
 [h2]More from konduct[/h2]
 [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3832026803]Browse the full Konduct's RimWorld Mods collection[/url]

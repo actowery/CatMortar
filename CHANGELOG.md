@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 - 2026-11-07
+
+- Add cat meat ammunition: load up to 20 pieces, then scatter one direct-hit meat chunk per piece across a 7-tile field. Damage, brief-stun chance, blood, and light building damage scale with the loaded rack.
+- Add automatic nearby cat-meat reload that never falls back to loading a colony cat.
+- Add **Waste loaded ammunition** to permanently clear the chamber, cancel automatic actions, and stand the operator down.
+- Add persisted forced pawn/building targets, repeated firing after reload and cooldown, and **Clear forced target**. Force target uses RimWorld's rebindable Misc 4 hotkey (default `N`).
+- Refine meat audio: no cat vocalization; use a layered flesh-splat and blunt-thump impact instead.
+- Fix survivor landing injuries for cats that already have missing limbs.
+- Refresh Workshop, README, manual-test, package, and release documentation.
+
 ## 1.0.0 - 2026-10-31
 
 - Initial public release of Cat Mortar for RimWorld 1.6 and 1.7 unstable.
