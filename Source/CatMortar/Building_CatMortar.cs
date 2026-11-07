@@ -119,23 +119,33 @@ public sealed class Building_CatMortar : Building, IThingHolder
     public bool OrderLoad(Thing target, int count = 1, Pawn? preferredHauler = null)
     {
         if (!CanAccept(target) || Map is null) return false;
-        var hauler = preferredHauler is not null
-            && preferredHauler.Spawned
-            && preferredHauler.CanReserve(target)
-            && preferredHauler.CanReserve(this)
-            && preferredHauler.CanReach(target, PathEndMode.Touch, Danger.Some)
-            ? preferredHauler
-            : Map.mapPawns.FreeColonistsSpawned
-            .Where(pawn => pawn.CanReserve(target) && pawn.CanReserve(this) && pawn.CanReach(target, PathEndMode.Touch, Danger.Some))
-            .OrderBy(pawn => pawn.Position.DistanceToSquared(target.Position)).FirstOrDefault();
+        var candidates = new List<Pawn>();
+        if (preferredHauler is not null) candidates.Add(preferredHauler);
+        if (ManningPawn is not null && !candidates.Contains(ManningPawn)) candidates.Add(ManningPawn);
+        candidates.AddRange(Map.mapPawns.FreeColonistsSpawned
+            .Where(pawn => !candidates.Contains(pawn))
+            .OrderBy(pawn => pawn.Position.DistanceToSquared(target.Position)));
+        // A manning pawn already reserves the mortar. Its newly ordered load job
+        // replaces manning and then obtains the normal job reservation, so do not
+        // reject it merely because the building is currently reserved.
+        var hauler = candidates.FirstOrDefault(pawn => pawn.Spawned
+            && !pawn.Dead
+            && pawn.CanReserve(target)
+            && pawn.CanReach(target, PathEndMode.Touch, Danger.Some)
+            && pawn.CanReach(this, PathEndMode.Touch, Danger.Some));
         if (hauler is null)
         {
-            if (preferredHauler is null) Messages.Message("No colonist can load that cat.", this, MessageTypeDefOf.RejectInput, false);
+            if (preferredHauler is null) Messages.Message("No colonist can reach and load that ammunition.", this, MessageTypeDefOf.RejectInput, false);
             return false;
         }
         var job = JobMaker.MakeJob(CatMortarDefOf.CatMortar_Load, target, this);
         job.count = Math.Min(Math.Max(1, count), target.stackCount);
-        hauler.jobs.TryTakeOrderedJob(job);
+        if (!hauler.jobs.TryTakeOrderedJob(job))
+        {
+            Messages.Message("The selected colonist could not start loading the cat mortar.", this, MessageTypeDefOf.RejectInput, false);
+            return false;
+        }
+        Messages.Message($"{hauler.LabelShortCap} is loading {job.count} {target.LabelCap}.", this, MessageTypeDefOf.NeutralEvent, false);
         return true;
     }
 
