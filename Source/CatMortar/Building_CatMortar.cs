@@ -61,8 +61,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "Load cat",
             defaultDesc = "Designate one colony cat or cat corpse. The cat is suspended inside the mortar until fired.",
             icon = TexCommand.Install,
-            targetingParams = new TargetingParameters { canTargetPawns = true, canTargetCorpses = true, validator = target => IsLivingCatOrCorpse(target.Thing) },
-            action = target => OrderLoad(target.Thing),
+            targetingParams = new TargetingParameters { canTargetLocations = false, canTargetPawns = true, canTargetAnimals = true, canTargetCorpses = true },
+            action = target => TryOrderCatLoad(target.Thing),
         };
         if (HasLoadedCat) loadCommand.Disable("A cat is already loaded.");
         yield return loadCommand;
@@ -71,8 +71,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
             defaultLabel = "CatMortar.LoadCatMeat".Translate(),
             defaultDesc = "CatMortar.LoadCatMeatDesc".Translate(CatMortarRules.MaximumCatMeatPerShot),
             icon = TexCommand.Install,
-            targetingParams = new TargetingParameters { canTargetItems = true, validator = target => IsCatMeat(target.Thing) },
-            action = target => OrderLoad(target.Thing, Math.Min(CatMortarRules.MaximumCatMeatPerShot, target.Thing.stackCount)),
+            targetingParams = new TargetingParameters { canTargetLocations = false, canTargetItems = true },
+            action = target => TryOrderCatMeatLoad(target.Thing),
         };
         if (HasLoadedCat) loadMeatCommand.Disable("A cat is already loaded.");
         yield return loadMeatCommand;
@@ -147,6 +147,26 @@ public sealed class Building_CatMortar : Building, IThingHolder
         }
         Messages.Message($"{hauler.LabelShortCap} is loading {job.count} {target.LabelCap}.", this, MessageTypeDefOf.NeutralEvent, false);
         return true;
+    }
+
+    private void TryOrderCatLoad(Thing? target)
+    {
+        if (target is null || !IsLivingCatOrCorpse(target))
+        {
+            Messages.Message("Select a colony cat or colony cat corpse.", this, MessageTypeDefOf.RejectInput, false);
+            return;
+        }
+        OrderLoad(target);
+    }
+
+    private void TryOrderCatMeatLoad(Thing? target)
+    {
+        if (target is null || !IsCatMeat(target))
+        {
+            Messages.Message("Select vanilla cat meat (Meat_Cat), not another animal's meat.", this, MessageTypeDefOf.RejectInput, false);
+            return;
+        }
+        OrderLoad(target, Math.Min(CatMortarRules.MaximumCatMeatPerShot, target.stackCount));
     }
 
     protected override void Tick()
