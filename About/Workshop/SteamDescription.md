@@ -22,6 +22,7 @@ Cat Mortar is a standalone RimWorld artillery mod for [b]1.6 and 1.7 unstable[/b
 [*]Colony cat corpses create a weaker 3-tile explosion and a toxic-gas cloud instead of a coat payload or survivor.
 [*]Cat meat automatically reloads nearby cat meat after firing, but never falls back to loading a colony cat. Each loaded piece becomes one wildly scattered, direct-hit meat chunk across a 7-tile field. A fuller rack raises each chunk from 4 to 7 [b]meat slapped[/b] damage and its brief-stun chance from 15% to 35%, with light siege damage and blood—but no normal explosion, toxic gas, coat payload, or survivor.
 [*][b]Force target[/b] uses the rebindable Controls > Misc 4 hotkey (default [b]N[/b]). Need to abort? [b]Waste loaded ammunition[/b] permanently discards the payload, cancels automatic reload/targeting, and tells the operator to stand down.
+[*]Forced pawn and building targets are remembered between shots, reloads, and cooldowns—the mortar keeps firing until the pawn dies/despawns or the structure is destroyed. Use [b]Clear forced target[/b] to stop the barrage; an empty-cell target is always a single shot.
 [*]Mortar-style warmup, cooldown, forced targeting, auto-targeting, operator reloading, and vanilla minimum-range behavior.
 [*]No runtime dependencies.
 [/list]

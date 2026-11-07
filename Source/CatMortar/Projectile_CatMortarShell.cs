@@ -135,7 +135,10 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         // Mote_FoodBitMeat is a native, guaranteed-present meat visual. Using it
         // avoids a second texture path that can break during Core asset changes.
         var fragmentDef = DefDatabase<ThingDef>.GetNamed("Mote_FoodBitMeat");
+        // A layered, deliberately non-animal impact: fleshy splat plus a heavy
+        // blunt thump. No cat vocalization is used for a meat barrage.
         DefDatabase<SoundDef>.GetNamed("BulletImpact_Flesh").PlayOneShot(new TargetInfo(center, map));
+        DefDatabase<SoundDef>.GetNamed("Pawn_Melee_BigBash_HitPawn").PlayOneShot(new TargetInfo(center, map));
         var chunkDamage = CatMortarRules.CatMeatChunkDamage(stackCount);
         var stunChance = CatMortarRules.CatMeatStunChance(stackCount);
         foreach (var _ in Enumerable.Range(0, CatMortarRules.CatMeatChunkCount(stackCount)))
@@ -188,11 +191,10 @@ public sealed class Projectile_CatMortarShell : Projectile, IThingHolder
         if (visualFacing < 0) visualFacing = Rand.RangeInclusive(0, 3);
         if (spinDirection == 0) spinDirection = Rand.Bool ? 1 : -1;
         if (firstDrawTick < 0) firstDrawTick = Find.TickManager.TicksGame;
-        if (!launchSoundPlayed && Map is not null)
-        {
-            DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
-            launchSoundPlayed = true;
-        }
+        // Launch audio is emitted by the mortar, which knows whether its payload
+        // is cat meat. Keep the visual initializer silent so a slow first draw
+        // cannot make a launch meow appear to happen at impact.
+        launchSoundPlayed = true;
     }
 
     private static bool IsCatMeat(Thing? thing) => thing is not null

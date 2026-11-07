@@ -18,6 +18,9 @@ public sealed class Building_CatMortar : Building, IThingHolder
     private int nextAutoReloadAttemptTick;
     private IntVec3 pendingTargetCell;
     private bool autoTargeting;
+    private bool forcedTargeting;
+    private IntVec3 forcedTargetCell;
+    private Thing? forcedTargetThing;
     private bool reloadPending;
     private bool reloadMeatPending;
     private Pawn? pendingReloadPawn;
@@ -41,6 +44,9 @@ public sealed class Building_CatMortar : Building, IThingHolder
         Scribe_Values.Look(ref nextAutoReloadAttemptTick, "nextAutoReloadAttemptTick", 0);
         Scribe_Values.Look(ref pendingTargetCell, "pendingTargetCell");
         Scribe_Values.Look(ref autoTargeting, "autoTargeting", false);
+        Scribe_Values.Look(ref forcedTargeting, "forcedTargeting", false);
+        Scribe_Values.Look(ref forcedTargetCell, "forcedTargetCell");
+        Scribe_References.Look(ref forcedTargetThing, "forcedTargetThing");
         Scribe_Values.Look(ref reloadPending, "reloadPending", false);
         Scribe_Values.Look(ref reloadMeatPending, "reloadMeatPending", false);
         Scribe_References.Look(ref pendingReloadPawn, "pendingReloadPawn");
@@ -88,7 +94,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
             icon = TexCommand.Attack,
             hotKey = KeyBindingDefOf.Misc4,
             targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = true, canTargetBuildings = true, canTargetItems = true },
-            action = target => QueueLaunch(target.Cell, false),
+            action = SetForcedTarget,
         };
         if (!HasLoadedCat) fireCommand.Disable("Load a colony cat or cat corpse first.");
         else if (!IsManned) fireCommand.Disable("A colonist must man the cat mortar.");
@@ -96,6 +102,16 @@ public sealed class Building_CatMortar : Building, IThingHolder
         else if (LaunchPending) fireCommand.Disable("The cat mortar is aiming.");
         else if (CoolingDown) fireCommand.Disable("The cat mortar is cooling down.");
         yield return fireCommand;
+
+        var clearTargetCommand = new Command_Action
+        {
+            defaultLabel = "Clear forced target",
+            defaultDesc = "Stop repeating fire at the forced pawn or structure target. Any shot already in its aiming warmup is cancelled.",
+            icon = TexCommand.ClearPrioritizedWork,
+            action = () => ClearForcedTarget(showMessage: true),
+        };
+        if (!forcedTargeting) clearTargetCommand.Disable("No forced pawn or structure target is locked.");
+        yield return clearTargetCommand;
 
         var unloadCommand = new Command_Action
         {
@@ -198,7 +214,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
         }
 
         if (reloadPending && !HasLoadedCat && !LaunchPending && now >= nextAutoReloadAttemptTick) TryOperatorReload(now);
-        if (autoTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueAutoTarget();
+        if (forcedTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueForcedTarget();
+        else if (autoTargeting && HasLoadedCat && !LaunchPending && !CoolingDown) TryQueueAutoTarget();
     }
 
     public override void DrawExtraSelectionOverlays()
@@ -225,6 +242,45 @@ public sealed class Building_CatMortar : Building, IThingHolder
         pendingTargetCell = ApplyOperatorAccuracy(targetCell);
         pendingLaunchTick = Find.TickManager.TicksGame + CatMortarRules.MortarWarmupTicks;
         if (!automatic) Messages.Message("Cat mortar aiming: 4 seconds.", this, MessageTypeDefOf.NeutralEvent, false);
+    }
+
+    private void SetForcedTarget(LocalTargetInfo target)
+    {
+        if (!CanStartLaunch(target.Cell, automatic: false)) return;
+
+        // Vanilla-style repeated fire is meaningful for a real pawn or building.
+        // A deliberately selected empty cell remains a one-shot bombardment.
+        forcedTargetThing = target.Thing;
+        forcedTargetCell = target.Cell;
+        forcedTargeting = forcedTargetThing is not null;
+        QueueLaunch(target.Cell, automatic: false);
+    }
+
+    private void TryQueueForcedTarget()
+    {
+        if (!TryGetForcedTargetCell(out var targetCell))
+        {
+            ClearForcedTarget(showMessage: false);
+            return;
+        }
+        QueueLaunch(targetCell, automatic: true);
+    }
+
+    private bool TryGetForcedTargetCell(out IntVec3 targetCell)
+    {
+        targetCell = forcedTargetCell;
+        if (forcedTargetThing is null || forcedTargetThing.Destroyed || !forcedTargetThing.Spawned) return false;
+        if (forcedTargetThing is Pawn pawn && pawn.Dead) return false;
+        targetCell = forcedTargetThing.Position;
+        return targetCell.InBounds(Map);
+    }
+
+    private void ClearForcedTarget(bool showMessage)
+    {
+        forcedTargeting = false;
+        forcedTargetThing = null;
+        pendingLaunchTick = -1;
+        if (showMessage) Messages.Message("Cat mortar forced target cleared.", this, MessageTypeDefOf.NeutralEvent, false);
     }
 
     private IntVec3 ApplyOperatorAccuracy(IntVec3 intendedTarget)
@@ -271,7 +327,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         loadedCoatIndex = -1;
         GenSpawn.Spawn(shell, Position, Map);
         DefDatabase<SoundDef>.GetNamed("Mortar_LaunchA").PlayOneShot(new TargetInfo(Position, Map));
-        DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
+        if (!IsCatMeat(payload)) DefDatabase<SoundDef>.GetNamed("Pawn_Cat_Call").PlayOneShot(new TargetInfo(Position, Map));
         shell.Launch(this, DrawPos, new LocalTargetInfo(targetCell), new LocalTargetInfo(targetCell), ProjectileHitFlags.IntendedTarget, false, null);
         var now = Find.TickManager.TicksGame;
         cooldownUntilTick = now + CatMortarRules.MortarCooldownTicks;
@@ -342,6 +398,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
         reloadMeatPending = false;
         nextAutoReloadAttemptTick = 0;
         autoTargeting = false;
+        forcedTargeting = false;
+        forcedTargetThing = null;
         var operatorPawn = ManningPawn;
         pendingReloadPawn = null;
         operatorPawn?.jobs?.EndCurrentJob(JobCondition.InterruptForced);
@@ -369,6 +427,8 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (Spawned && innerContainer?.Any == true) innerContainer.TryDropAll(Position, Map, ThingPlaceMode.Near);
         loadedCoatIndex = -1;
         pendingLaunchTick = -1;
+        forcedTargeting = false;
+        forcedTargetThing = null;
         reloadPending = false;
         reloadMeatPending = false;
         pendingReloadPawn = null;
