@@ -19,6 +19,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
     private IntVec3 pendingTargetCell;
     private bool autoTargeting;
     private bool reloadPending;
+    private bool reloadMeatPending;
     private Pawn? pendingReloadPawn;
 
     public Building_CatMortar() => innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
@@ -41,6 +42,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         Scribe_Values.Look(ref pendingTargetCell, "pendingTargetCell");
         Scribe_Values.Look(ref autoTargeting, "autoTargeting", false);
         Scribe_Values.Look(ref reloadPending, "reloadPending", false);
+        Scribe_Values.Look(ref reloadMeatPending, "reloadMeatPending", false);
         Scribe_References.Look(ref pendingReloadPawn, "pendingReloadPawn");
         if (innerContainer is null) innerContainer = new ThingOwner<Thing>(this, oneStackOnly: true);
     }
@@ -82,8 +84,9 @@ public sealed class Building_CatMortar : Building, IThingHolder
         var fireCommand = new Command_Target
         {
             defaultLabel = "Force target",
-            defaultDesc = "Aim the loaded cat like a mortar. Targets inside the red dead zone are rejected.",
+            defaultDesc = "Aim the loaded cat like a mortar. Hotkey: N (rebindable under Controls > Misc 4). Targets inside the red dead zone are rejected.",
             icon = TexCommand.Attack,
+            hotKey = KeyBindingDefOf.Misc4,
             targetingParams = new TargetingParameters { canTargetLocations = true, canTargetPawns = true, canTargetBuildings = true, canTargetItems = true },
             action = target => QueueLaunch(target.Cell, false),
         };
@@ -93,6 +96,16 @@ public sealed class Building_CatMortar : Building, IThingHolder
         else if (LaunchPending) fireCommand.Disable("The cat mortar is aiming.");
         else if (CoolingDown) fireCommand.Disable("The cat mortar is cooling down.");
         yield return fireCommand;
+
+        var unloadCommand = new Command_Action
+        {
+            defaultLabel = "Waste loaded ammunition",
+            defaultDesc = "Permanently destroy the loaded cat, corpse, or cat meat. This cancels automatic reload and tells the current operator to stand down.",
+            icon = TexCommand.ClearPrioritizedWork,
+            action = WasteLoadedAmmunition,
+        };
+        if (!HasLoadedCat) unloadCommand.Disable("No ammunition is loaded.");
+        yield return unloadCommand;
 
         yield return new Command_Toggle
         {
@@ -263,9 +276,10 @@ public sealed class Building_CatMortar : Building, IThingHolder
         var now = Find.TickManager.TicksGame;
         cooldownUntilTick = now + CatMortarRules.MortarCooldownTicks;
         pendingReloadPawn = ManningPawn;
-        // Meat is deliberately manual-only. It must never turn into an automatic
-        // colony-cat reload once the last chunk has been fired.
-        reloadPending = pendingReloadPawn is not null && !IsCatMeat(payload);
+        // Preserve the ammunition mode: a meat volley seeks more meat, never an
+        // unsuspecting colony cat after the meat stack runs out.
+        reloadMeatPending = IsCatMeat(payload);
+        reloadPending = pendingReloadPawn is not null;
         nextAutoReloadAttemptTick = cooldownUntilTick;
     }
 
@@ -276,7 +290,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         if (!HasLoadedCat) return inspect;
 
         var payloadInfo = IsCatMeat(LoadedThing!)
-            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across a {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage(LoadedThing.stackCount)} meat slapped damage with {CatMortarRules.CatMeatStunChance(LoadedThing.stackCount):P0} brief-stun chance\nMode: manual load only"
+            ? $"Loaded: {LoadedThing!.stackCount} cat meat\nPayload: {CatMortarRules.CatMeatChunkCount(LoadedThing.stackCount)} meat chunks across a {CatMortarRules.CatMeatScatterRadius:0}-tile area; direct hits deal {CatMortarRules.CatMeatChunkDamage(LoadedThing.stackCount)} meat slapped damage with {CatMortarRules.CatMeatStunChance(LoadedThing.stackCount):P0} brief-stun chance\nMode: auto-reload cat meat"
             : $"Loaded: {LoadedThing!.LabelCap}\nPayload: {CatMortarVisuals.CoatLabel(loadedCoatIndex)}\nMode: {(autoTargeting ? "auto-target enemies" : "force target")}";
         return string.IsNullOrWhiteSpace(inspect) ? payloadInfo : $"{inspect}\n{payloadInfo}";
     }
@@ -298,11 +312,40 @@ public sealed class Building_CatMortar : Building, IThingHolder
             reloadPending = false;
             return;
         }
+        if (reloadMeatPending)
+        {
+            var meat = Map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+                .Where(IsCatMeat)
+                .OrderBy(thing => Position.DistanceToSquared(thing.Position))
+                .FirstOrDefault();
+            if (meat is not null && OrderLoad(meat, Math.Min(CatMortarRules.MaximumCatMeatPerShot, meat.stackCount), pendingReloadPawn)) reloadPending = false;
+            return;
+        }
+
         var cat = Map.mapPawns.AllPawnsSpawned
             .Where(IsAutomaticAmmoCat)
             .OrderBy(pawn => Position.DistanceToSquared(pawn.Position))
             .FirstOrDefault();
         if (cat is not null && OrderLoad(cat, preferredHauler: pendingReloadPawn)) reloadPending = false;
+    }
+
+    private void WasteLoadedAmmunition()
+    {
+        var payload = LoadedThing;
+        if (payload is null) return;
+
+        innerContainer.Remove(payload);
+        payload.Destroy(DestroyMode.Vanish);
+        loadedCoatIndex = -1;
+        pendingLaunchTick = -1;
+        reloadPending = false;
+        reloadMeatPending = false;
+        nextAutoReloadAttemptTick = 0;
+        autoTargeting = false;
+        var operatorPawn = ManningPawn;
+        pendingReloadPawn = null;
+        operatorPawn?.jobs?.EndCurrentJob(JobCondition.InterruptForced);
+        Messages.Message("Loaded cat mortar ammunition was wasted. The operator has stood down.", this, MessageTypeDefOf.NegativeEvent, false);
     }
 
     private static bool IsAutomaticAmmoCat(Pawn pawn) => pawn.def.defName == "Cat"
@@ -327,6 +370,7 @@ public sealed class Building_CatMortar : Building, IThingHolder
         loadedCoatIndex = -1;
         pendingLaunchTick = -1;
         reloadPending = false;
+        reloadMeatPending = false;
         pendingReloadPawn = null;
         base.Destroy(mode);
     }
