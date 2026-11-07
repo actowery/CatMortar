@@ -10,7 +10,7 @@ public sealed class JobDriver_CatMortarLoad : JobDriver
     private Thing Cat => TargetA.Thing;
     private Building_CatMortar Mortar => (Building_CatMortar)TargetB.Thing;
 
-    public override bool TryMakePreToilReservations(bool errorOnFailed) => pawn.Reserve(Cat, job, 1, -1, null, errorOnFailed) && pawn.Reserve(Mortar, job, 1, -1, null, errorOnFailed);
+    public override bool TryMakePreToilReservations(bool errorOnFailed) => pawn.Reserve(Cat, job, 1, job.count, null, errorOnFailed) && pawn.Reserve(Mortar, job, 1, -1, null, errorOnFailed);
 
     protected override IEnumerable<Toil> MakeNewToils()
     {
